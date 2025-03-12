@@ -1,0 +1,8 @@
+Metadata-Version: 2.2
+Name: disco-sui
+Version: 0.1.0
+Requires-Dist: openai
+Requires-Dist: smolagents[gradio]
+Requires-Dist: python-dotenv
+Requires-Dist: gradio>=5.13.2
+Dynamic: requires-dist

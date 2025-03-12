@@ -1,0 +1,329 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+
+DiscoSui Project
+
+1. Project Overview
+* Project Name: ObsidianSmolAgent
+* Goal:
+    * Create a local-first application that uses smolagents to manage and automate tasks within an Obsidian vault.
+    * Streamline workflow, automate content generation, and manage vault structure.
+* Target Audience: Obsidian users seeking to enhance their Obsidian experience through automation.
+
+* Key Features:
+    * Note creation and management.
+    * Tag management.
+    * Hierarchy management (folder operations).
+    * Template-based content generation.
+    * Frontmatter manipulation.
+    * Local LLM-powered content generation (optional, but highly recommended).
+    * Audio transcription and integration with notes.
+    * Email processing and integration with notes.
+    * Vault indexing for efficient searching and retrieval.
+    * Semantic analysis of notes for relationship discovery and knowledge graph creation.
+    * Note reorganization and restructuring based on defined rules or LLM suggestions.
+    * Content manipulation for bulk updates, formatting, and transformations.
+    * Database integration for structured data storage and retrieval.
+* Specific Template Structures:
+    * Category (#Category) Template 📂:
+        * file_type: #Category
+        * tags: #{{category_tag}} #{{optional_subtag}}
+        * parent: [[{{parent_category::contains}}]]
+        * related_links: - [[{{related_note::references}}]]
+        * created_date: {{date:YYYY-MM-DD HH:mm:ss}}
+    * Document (#Document) Template 📄:
+        * type: #Document
+        * tags: #{{document_type}} #{{document_status}}
+        * title: "{{document_title}}"
+        * document_author: "{{document_author}}"
+        * parent: [[{{parent_category::contains}}]]
+        * created: {{date:YYYY-MM-DD HH:mm:ss}}
+        * modified: {{date:YYYY-MM-DD HH:mm:ss}}
+    * Note (#Note) Template 💡:
+        * type: #Note
+        * tags: #{{note_type}} #{{note_status}}
+        * parent: [[{{parent_note::contains}}]]
+        * related: [[{{related_note::references}}]]
+        * child: [[{{child_note::contains}}]]
+        * created: {{date:YYYY-MM-DD}}
+    * Code (#Code) Template 💻:
+        * type: #Code
+        * tags: #{{language}} #{{project::disco_omnia}} #{{topic::functionality}}
+        * parent: [[{{parent_note::contains}}]]
+        * created: {{date:YYYY-MM-DD HH:mm:ss}}
+        * modified: {{date:YYYY-MM-DD HH:mm:ss}}
+    * Log (#Log) Template 🎙️:
+        * type: #Log
+        * tags: #{{log_type}} #{{log_status}}
+        * parent: [[DailyLogs::contains]]
+        * created: {{date:YYYY-MM-DD}}
+    * Main (#Main) Template 🔗:
+        * file_type: #Main
+        * tags: #{{main_tag}} #{{optional_subtag}}
+        * parent: [[{{parent_category::contains}}]]
+        * related_links: - [[{{related_note::references}}]]
+        * created_date: {{date:YYYY-MM-DD HH:mm:ss}}
+    * Person (#Person) Template 👤:
+        * file_type: #Person
+        * tags: #{{person_tag}} #{{optional_subtag}}
+        * related_links: - [[contains::contains]] 💼 - [[contains::contains]] 📈 - [[contains::contains]] 🎵 - [[contains::contains]] 🏠 - [[contains::contains]] 💰 - [[contains::contains]] 🛠️
+        * created_date: {{date:YYYY-MM-DD HH:mm:ss}}
+2. Technology Stack
+* Programming Language: Python 3.9+
+* Agent Framework: smolagents
+* Templating: jinja2
+* Markdown Parsing: markdown-it-py
+* YAML Parsing: PyYAML
+* File System Interaction: os, pathlib
+* LLM: openai gpt 4 o mini
+* Audio library: whisper
+* Email library: email
+3. Project Structure
+ObsidianSmolAgent/
+├── obsidian_smolagent/
+│   ├── __init__.py
+│   ├── agent.py
+│   ├── tools.py
+│   ├── obsidian_utils.py
+│   ├── templates/
+│   ├── config.py
+│   ├── index.py
+│   ├── semantic.py
+│   ├── reorganization.py
+│   ├── content_manipulation.py
+│   ├── database.py
+│   ├── audio_transcriber.py
+│   ├── email_processor.py
+│   └── exceptions.py
+├── tests/
+│   ├── __init__.py
+│   ├── test_agent.py
+│   ├── test_tools.py
+│   ├── test_obsidian_utils.py
+│   ├── test_index.py
+│   ├── test_semantic.py
+│   ├── test_reorganization.py
+│   ├── test_content_manipulation.py
+│   ├── test_audio_transcriber.py
+│   ├── test_email_processor.py
+│   └── test_database.py
+├── README.md
+├── requirements.txt
+└── .gitignore
+4. Detailed Implementation
+* 4.1. config.py:
+    * Store the Obsidian vault path and any LLM-related settings.
+    * Store audio and email related directory paths.
+    * Paths
+        * VAULT_PATH = "'/Volumes/HomeX/yavuztopsever/Library/Mobile Documents/com~apple~CloudDocs/vault'"
+        * AUDIO_FILES_DIR = "'/Volumes/HomeX/yavuztopsever/Library/Mobile Documents/iCloud~com~TapMediaLtd~VoiceRecorderFREE/Documents'"
+        * RAW_EMAILS_DIR = "path/to/your/emails"
+        * PROCESSED_EMAILS_DIR = "path/to/your/processed_emails"
+* 4.2. obsidian_utils.py:
+    * Implement functions for interacting with the Obsidian vault:
+        * get_note_path(note_name)
+        * read_note(note_path)
+        * write_note(note_path, content)
+        * get_frontmatter(note_content)
+        * update_frontmatter(note_content, new_frontmatter)
+        * render_template(template_name, context)
+        * create_folder(folder_path)
+        * move_file(source, destination)
+* 4.3. tools.py:
+    * Define tools for the smolagents agent using the @tool decorator.
+    * Implement tools:
+        * create_new_note(note_name, template_name, context)
+        * add_tag_to_note(note_name, tag)
+        * update_note_frontmatter(note_name, frontmatter_updates)
+        * create_new_folder(folder_name)
+        * move_note(note_name, destination_folder)
+        * transcribe_audio_file(audio_file_path)
+        * process_email(email_file_path)
+    * Ensure each tool has a detailed docstring.
+* 4.4. agent.py:
+    * Import SmolAgent and the tools from tools.py.
+    * Instantiate SmolAgent with the defined tools.
+    * Implement a function to accept user tasks.
+    * Pass the tasks to agent.run() and handle the results.
+    * Example given in the previous response.
+* 4.5. templates/:
+    * Create Jinja2 templates for note generation.
+    * Include all the template structures listed in the overview.
+* 4.6. audio_transcriber.py:
+    * Handles audio transcription using the whisper library (or a configurable alternative).
+    * Functions:
+        * transcribe_audio(audio_file_path): Transcribes audio from a file.
+        * save_transcription(transcription, output_txt_path=""): Saves the transcription to a text file.
+    * Handles errors and provides informative messages.
+    * Uses config.py for audio file directory settings.
+* 4.7. email_processor.py:
+    * Processes email files (EML or JSON).
+    * Functions:
+        * process_email_file(email_file_path): Extracts email data (sender, subject, body).
+        * save_processed_email(email_data, output_path=""): Saves processed email data to a file.
+    * Handles different email file formats and errors.
+    * Uses config.py for email file directory settings.
+* 4.8. index.py:
+    * Implements vault indexing for efficient searching and retrieval.
+    * May use a database or an in-memory index.
+    * Provides functions for indexing notes and searching for keywords.
+* 4.9. semantic.py:
+    * Performs semantic analysis of notes to discover relationships and create a knowledge graph.
+    * May use LLM embeddings or other semantic analysis techniques.
+    * Provides functions for extracting entities, relationships, and concepts.
+* 4.10. reorganization.py:
+    * Implements note reorganization based on defined rules or LLM suggestions.
+    * Provides functions for moving, renaming, and restructuring notes and folders.
+    * May use configuration settings or user-defined rules.
+* 4.11. content_manipulation.py:
+    * Provides functions for bulk updates, formatting, and transformations of note content.
+    * May include functions for replacing text, adding or removing frontmatter, and formatting Markdown.
+* 4.12. database.py:
+    * Implements database integration for structured data storage and retrieval (optional, configurable).
+    * Supports sqlite3 as a default option and provides an interface for other databases.
+    * Provides functions for creating, reading, updating, and deleting data.
+* 4.13 exceptions.py:
+    * Creates custom exception classes for the project.
+    * Examples: NoteNotFoundError, NoteAlreadyExistsError, FolderNotFoundError, TemplateNotFoundError, FrontmatterError, ObsidianIOError.
+5. Testing
+* Write comprehensive unit tests for all components using pytest.
+* Test obsidian_utils.py functions, tool functions, and agent behavior.
+* Ensure proper error handling and edge case coverage.
+* Create separate test files for each module (e.g., test_audio_transcriber.py, test_email_processor.py).
+* Mock external dependencies (e.g., LLM, file system) for isolated testing.
+6. LLM Integration
+* Use openai gpt-4-o-mini.
+* Implement LLM-powered content generation and enhancement (optional, configurable).
+* Use LLM for semantic analysis, note reorganization, and other tasks.
+* Ensure proper error handling and rate limiting.
+7. Documentation
+* Write a detailed README.md file:
+    * Project description.
+    * Installation instructions.
+    * Usage examples.
+    * Configuration details.
+    * Development guidelines.
+8. requirements.txt
+keep updating
+9. Coding Agent Instructions
+* Follow the project structure and implementation details.
+* Prioritize functionality and code clarity.
+* Write comprehensive unit tests.
+* Adhere to Python best practices.
+* Follow the smolagents documentation and utilize the @tool decorator and SmolAgent class correctly.
+* Handle file path issues robustly and ensure cross-platform compatibility.
+* Create a robust method of handling errors and informing the user.
+* Create a system that can handle very large Obsidian vaults and optimize for speed.
+* Make sure to follow the given templates and structures for the vault.
+* Make sure to modify any notes that do not follow the template structure to match.
+10. Error Handling and Robustness
+* Custom Exceptions:
+    * Utilize the custom exceptions defined in exceptions.py to provide specific and informative error messages.
+    * Handle exceptions gracefully at appropriate levels of the application.
+* Input Validation:
+    * Implement thorough input validation for all functions and tools to prevent unexpected errors.
+    * Validate file paths, data types, and user inputs.
+* File System Robustness:
+    * Handle file system interactions with care, including checking for file existence, permissions, and disk space.
+    * Utilize pathlib for cross-platform file path handling.
+    * Implement file locking or other mechanisms to prevent data corruption in concurrent operations.
+* LLM Error Handling:
+    * Implement retry mechanisms for LLM API calls to handle transient errors.
+    * Handle rate limiting and API errors gracefully.
+    * Provide informative error messages to the user in case of LLM failures.
+* Logging:
+    * Implement a comprehensive logging system to track application behavior, errors, and warnings.
+    * Use the logging module to log events at different levels (debug, info, warning, error, critical).
+    * Log all errors to a log file.
+* Data Integrity:
+    * Implement data validation and integrity checks to ensure that the Obsidian vault and associated data remain consistent.
+    * Use transactions or other mechanisms to ensure atomicity of operations.
+11. Performance Optimization
+* Indexing:
+    * Implement efficient indexing mechanisms for the Obsidian vault to enable fast searching and retrieval.
+    * Consider using a database or an in-memory index for optimal performance.
+* Caching:
+    * Implement caching mechanisms to store frequently accessed data and reduce redundant computations.
+    * Cache LLM responses, template renderings, and file system metadata.
+* Asynchronous Operations:
+    * Utilize asynchronous programming techniques (e.g., asyncio) to improve performance for I/O-bound operations, such as file system access and LLM API calls.
+* Efficient Algorithms:
+    * Use efficient algorithms and data structures to minimize processing time and memory usage.
+    * Optimize code for performance-critical sections of the application.
+* Database Optimization:
+    * If a database is used, optimize database queries and indexing for fast data retrieval.
+* Large Vault Handling:
+    * When dealing with very large vaults. Make sure to only load the data that is needed, and do not load the entire vault into memory.
+    * When performing operations on the vault, perform them in batches.
+12. User Interface (CLI/Future GUI Considerations)
+* Command-Line Interface (CLI):
+    * Implement a user-friendly CLI using argparse or click to provide a clear and intuitive way to interact with the application.
+    * Provide help messages and usage examples for all commands.
+    * Provide clear and informative output to the user.
+* Future GUI Considerations:
+    * Consider developing a graphical user interface (GUI) using a cross-platform framework like Tkinter, PyQt, or Kivy to provide a more visual and interactive experience.
+    * Design the GUI with user-friendliness and accessibility in mind.
+* Progress Indicators:
+    * When performing long running tasks, provide progress indicators to the user.
+13. Cross-Platform Compatibility
+* File Path Handling:
+    * Use pathlib for file path manipulation to ensure cross-platform compatibility.
+* Operating System Dependencies:
+    * Minimize operating system dependencies and use platform-independent libraries whenever possible.
+* Testing on Multiple Platforms:
+    * Test the application on multiple operating systems (Windows, macOS, Linux) to ensure compatibility.
+14. Security Considerations
+* Input Sanitization:
+    * Sanitize user inputs to prevent security vulnerabilities, such as command injection and cross-site scripting (XSS).
+* File System Security:
+    * Restrict file system access to the Obsidian vault and relevant directories.
+    * Avoid storing sensitive information in the Obsidian vault or configuration files.
+* LLM API Security:
+    * Store LLM API keys securely and avoid hardcoding them in the application.
+    * Use environment variables or secure configuration files.
+15. Future Enhancements
+* Plugin System:
+    * Implement a plugin integration for Obsidian to allow user to extend the functionality of ObsidianSmolAgent to obsidian.
+* Web Integration:
+    * Integrate with web services and APIs to enhance the application's capabilities.
+* Scheduled Task Execution:
+    * Allow the user to schedule tasks to be run at specific times such as vault organizasion audio transcription etc.
+* Multi-Vault Support:
+    * Allow the program to work with multiple Obsidian vaults.
+16. Code Style and Maintainability
+* PEP 8 Compliance:
+    * Adhere to PEP 8 style guidelines for Python code to ensure consistency and readability.
+    * Use a linter (e.g., flake8, pylint) to enforce PEP 8 compliance.
+* Type Hinting:
+    * Utilize pydantic for validation and hinting
+* Docstrings:
+    * Write comprehensive docstrings for all functions, classes, and modules to explain their purpose and usage.
+    * Follow a consistent docstring format (Google Style).
+* Code Modularity:
+    * Design the application with a modular architecture to improve code organization and maintainability.
+    * Separate concerns into distinct modules and classes.
+* Code Reusability:
+    * Write reusable code components to minimize duplication and improve maintainability.
+    * Create utility functions and classes for common tasks.
+* Code Comments:
+    * Add clear and concise comments to explain complex logic and non-obvious code sections.
+    * Avoid redundant comments that simply restate the code.
+* Version Control:
+    * Use Git for version control to track changes and collaborate effectively.
+    * Write clear and informative commit messages.
+    * Use branches for feature development and bug fixes.
+* Code Reviews:
+    * Conduct regular code reviews to identify potential issues and improve code quality.
+17. Dependency Management
+* requirements.txt:
+    * Maintain an accurate requirements.txt file to list all project dependencies.
+    * Use virtual environments to isolate project dependencies.
+* Dependency Updates:
+    * Regularly update project dependencies to benefit from bug fixes, security patches, and new features.
+    * Test the application thoroughly after updating dependencies.
+* Dependency Conflicts:
+    * Resolve dependency conflicts carefully to ensure that all dependencies are compatible.
+    * Use dependency management tools (e.g., pip-compile) to manage dependency versions.

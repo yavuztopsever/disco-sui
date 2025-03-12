@@ -1,0 +1,10 @@
+{
+  "id": "obsidian-disco-sui",
+  "name": "DiscoSui Integration",
+  "version": "1.0.0",
+  "minAppVersion": "0.15.0",
+  "description": "Integrate DiscoSui's AI-powered note management capabilities with Obsidian",
+  "author": "Yavuz Topsever",
+  "authorUrl": "https://github.com/yavuztopsever/disco-sui",
+  "isDesktopOnly": false
+} 
