@@ -1,4 +1,0 @@
-openai
-smolagents[gradio]
-python-dotenv
-gradio>=5.13.2
