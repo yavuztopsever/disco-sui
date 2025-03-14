@@ -1,3 +1,8 @@
+---
+description: project guide to follow
+globs: 
+alwaysApply: false
+---
 # DiscoSui - Your Intelligent Obsidian Companion
 
 ## 1. Project Overview
@@ -35,24 +40,32 @@ Obsidian users who seek:
 discosui/
 ├── backend/                 # Python FastAPI backend
 │   ├── src/
-│   │   ├── services/       # Core services
-│   │   │   ├── email/      # Email processing service
-│   │   │   ├── audio/      # Audio processing service
-│   │   │   ├── content/    # Content management service
-│   │   │   ├── analysis/   # Semantic analysis and indexing service
-│   │   │   └── organization/ # Tag and structure management service
 │   │   ├── core/           # Core functionality and shared components
+│   │   ├── services/       # Core services
 │   │   ├── tools/          # Tools for SmolAgents to call
-│   │   └── agents/         # AI agents implementation
-│   ├── tests/              # Backend tests
+│   │   ├── agents/         # AI agents implementation
+│   │   └── main.py         # Main application entry point
 │   └── requirements.txt    # Python dependencies
+├── frontend/               # React frontend
+│   ├── src/
+│   │   ├── App.js         # Main React component
+│   │   └── index.js       # React entry point
+├── src/                    # Obsidian plugin source
 ├── docs/                   # Project documentation
 │   ├── api/               # API documentation
 │   ├── architecture/      # Architecture docs
 │   └── services/          # Service-specific documentation
-└── docker/                # Docker configuration
-
-
+├── docker/                # Docker configuration
+├── config/                # Configuration files
+├── rules/                 # Project rules and documentation
+├── obsidian-disco-sui-plugin/ # Obsidian plugin directory
+├── manifest.json          # Plugin manifest
+├── package.json           # Node.js dependencies
+├── tsconfig.json         # TypeScript configuration
+├── requirements.txt      # Python dependencies
+├── setup.sh             # Setup script
+├── run.sh              # Run script
+└── version-bump.mjs    # Version management script
 
 ### 2.5. Core Workflow
 

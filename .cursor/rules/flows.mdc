@@ -1,0 +1,879 @@
+---
+description: visual representations of the application flows within the DiscoSui application using Mermaid diagrams.
+globs: 
+alwaysApply: false
+---
+# DiscoSui Application Flows
+
+This document provides visual representations of the various flows within the DiscoSui application using Mermaid diagrams.
+
+## Main Application Flow
+
+```mermaid
+graph TD
+    %% Main User Interaction Flow
+    A[User Input] --> B[Chat Interface]
+    B --> C{Tool Manager Analysis}
+    
+    %% Question Processing Branch
+    C -->|Question| D[RAG Processing]
+    D --> D1[Query Classification]
+    D1 --> D2[Query Enhancement]
+    D2 --> F[Vector DB Search]
+    F --> F1[Semantic Search]
+    F1 --> F2[Keyword Search]
+    F2 --> G[Context Retrieval]
+    G --> G1[Context Ranking]
+    G1 --> G2[Context Merging]
+    G2 --> H[LLM Response]
+    H --> H1[Response Generation]
+    H1 --> H2[Response Enhancement]
+    
+    %% Action Processing Branch
+    C -->|Action| E[Tool Execution]
+    E --> E1[Tool Validation]
+    E1 --> E2[Permission Check]
+    E2 --> E3[Tool Setup]
+    E3 --> I[Execute Tool]
+    I --> I1[Monitor Execution]
+    I1 --> I2[Handle Tool Output]
+    I2 --> J[Update Vault]
+    
+    %% Response Handling
+    H2 --> K[Display Response]
+    J --> K
+    K --> K1[Format Response]
+    K1 --> K2[Add Citations]
+    K2 --> L[Open Relevant Notes]
+    L --> L1[Load Note Preview]
+    L1 --> L2[Update UI State]
+```
+
+## Note Creation and Management Flow
+
+```mermaid
+graph TD
+    %% Initial Request
+    A[Create Note Request] --> A1[Validate Request]
+    A1 --> A2[Check Permissions]
+    A2 --> B{Template Specified?}
+    
+    %% Template Processing
+    B -->|Yes| C[Load Template]
+    C --> C1[Template Validation]
+    C1 --> C2[Parse Template Variables]
+    C2 --> E[Apply Template]
+    
+    %% Empty Note Creation
+    B -->|No| D[Create Empty Note]
+    D --> D1[Generate Default Structure]
+    D1 --> D2[Add Metadata]
+    
+    %% Content Processing
+    E --> E1[Process Frontmatter]
+    D2 --> E1
+    E1 --> E2[Process Body Content]
+    E2 --> F[Validate Content]
+    
+    %% Note Storage and Indexing
+    F --> G[Write Note]
+    G --> G1[Create Backup]
+    G1 --> G2[Verify Write]
+    G2 --> H[Index Content]
+    H --> H1[Generate Embeddings]
+    H1 --> H2[Update Search Index]
+    H2 --> I[Update Vector DB]
+    
+    %% Relationship Management
+    I --> J[Generate Backlinks]
+    J --> J1[Update Related Notes]
+    J1 --> J2[Rebuild Note Graph]
+    J2 --> K[Notify Subscribers]
+```
+
+## Audio Processing Flow
+
+```mermaid
+graph TD
+    %% Initial Audio Processing
+    A[Audio File] --> A1[Validate Format]
+    A1 --> A2[Check File Size]
+    A2 --> A3[Prepare Audio]
+    A3 --> B[Transcription Service]
+    
+    %% Transcription Process
+    B --> B1[Split Audio Chunks]
+    B1 --> B2[Process Chunks]
+    B2 --> B3[Merge Transcripts]
+    B3 --> C[Create Note]
+    
+    %% Note Creation and Enhancement
+    C --> D[Apply Audio Template]
+    D --> D1[Format Transcript]
+    D1 --> D2[Add Timestamps]
+    D2 --> E[Extract Key Information]
+    
+    %% Analysis and Enhancement
+    E --> E1[Named Entity Recognition]
+    E1 --> E2[Topic Modeling]
+    E2 --> E3[Sentiment Analysis]
+    E3 --> F[Generate Summary]
+    
+    %% Task and Action Items
+    F --> G[Create Task List]
+    G --> G1[Priority Assignment]
+    G1 --> G2[Due Date Detection]
+    G2 --> H[Generate Suggestions]
+    
+    %% Indexing and Integration
+    H --> I[Update Index]
+    I --> I1[Generate Audio Preview]
+    I1 --> I2[Create Waveform]
+    I2 --> J[Link Related Content]
+```
+
+## Email Processing Flow
+
+```mermaid
+graph TD
+    %% Initial Email Processing
+    A[Email File] --> A1[Validate Email]
+    A1 --> A2[Check Security]
+    A2 --> B[Email Processor]
+    
+    %% Content Extraction
+    B --> B1[Parse Headers]
+    B1 --> B2[Process Body]
+    B2 --> B3[Handle Encoding]
+    B3 --> C[Extract Content]
+    
+    %% Note Creation
+    C --> C1[Format Content]
+    C1 --> C2[Clean HTML]
+    C2 --> D[Create Note]
+    
+    %% Template Application
+    D --> E[Apply Email Template]
+    E --> E1[Add Metadata]
+    E1 --> E2[Format Body]
+    E2 --> F[Process Attachments]
+    
+    %% Attachment Handling
+    F --> F1[Validate Attachments]
+    F1 --> F2[Store Attachments]
+    F2 --> G[Link Attachments]
+    
+    %% Task Processing
+    G --> H[Extract Tasks]
+    H --> H1[Set Task Properties]
+    H1 --> H2[Create Calendar Events]
+    H2 --> I[Update Index]
+    
+    %% Integration
+    I --> I1[Update Email Thread]
+    I1 --> I2[Link Related Emails]
+    I2 --> J[Send Notifications]
+```
+
+## RAG Query Flow
+
+```mermaid
+graph TD
+    %% Query Processing
+    A[User Query] --> A1[Query Analysis]
+    A1 --> A2[Query Enhancement]
+    A2 --> B[Embed Query]
+    
+    %% Vector Search
+    B --> B1[Generate Embeddings]
+    B1 --> B2[Optimize Query]
+    B2 --> C[Search Vector DB]
+    
+    %% Result Processing
+    C --> C1[Filter Results]
+    C1 --> C2[Apply Thresholds]
+    C2 --> D[Retrieve Chunks]
+    
+    %% Result Enhancement
+    D --> D1[Expand Context]
+    D1 --> D2[Merge Chunks]
+    D2 --> E[Rank Results]
+    
+    %% Context Formation
+    E --> E1[Remove Duplicates]
+    E1 --> E2[Order Results]
+    E2 --> F[Format Context]
+    
+    %% Response Generation
+    F --> G[LLM Processing]
+    G --> G1[Generate Draft]
+    G1 --> G2[Enhance Response]
+    G2 --> H[Generate Response]
+    
+    %% Citation and Verification
+    H --> H1[Add Citations]
+    H1 --> H2[Verify Sources]
+    H2 --> I[Add Source Links]
+    
+    %% Response Delivery
+    I --> I1[Format Output]
+    I1 --> I2[Cache Results]
+    I2 --> J[Return Response]
+```
+
+## Note Reorganization Flow
+
+```mermaid
+graph TD
+    %% Initial Analysis
+    A[Reorganization Request] --> A1[Validate Request]
+    A1 --> A2[Check Permissions]
+    A2 --> B[Analyze Content]
+    
+    %% Content Analysis
+    B --> B1[Check Structure]
+    B1 --> B2[Analyze Relations]
+    B2 --> C[Find Related Notes]
+    
+    %% Decision Process
+    C --> C1[Calculate Similarity]
+    C1 --> C2[Check References]
+    C2 --> D{Need Split?}
+    
+    %% Split Processing
+    D -->|Yes| E[Split Note]
+    E --> E1[Determine Split Points]
+    E1 --> E2[Create New Notes]
+    E2 --> H[Update Structure]
+    
+    %% Merge Processing
+    D -->|No| F{Need Merge?}
+    F -->|Yes| G[Merge Notes]
+    G --> G1[Combine Content]
+    G1 --> G2[Resolve Conflicts]
+    G2 --> H
+    
+    %% Structure Update
+    F -->|No| H
+    H --> H1[Update Headers]
+    H1 --> H2[Fix Links]
+    H2 --> I[Update Backlinks]
+    
+    %% Index Update
+    I --> I1[Update References]
+    I1 --> I2[Rebuild Index]
+    I2 --> J[Update Index]
+    
+    %% Notification
+    J --> K[Notify Changes]
+    K --> L[Update UI]
+```
+
+## Template Management Flow
+
+```mermaid
+graph TD
+    %% Template Request Processing
+    A[Template Request] --> A1[Parse Request]
+    A1 --> A2[Check Permissions]
+    A2 --> B{Template Exists?}
+    
+    %% Existing Template
+    B -->|Yes| C[Load Template]
+    C --> C1[Read Template]
+    C1 --> C2[Parse Variables]
+    
+    %% New Template
+    B -->|No| D[Create Template]
+    D --> D1[Generate Structure]
+    D1 --> D2[Add Metadata]
+    
+    %% Template Validation
+    C2 --> E[Validate Template]
+    D2 --> E
+    E --> E1[Check Syntax]
+    E1 --> E2[Verify Variables]
+    
+    %% Template Application
+    E2 --> F[Apply Template]
+    F --> F1[Replace Variables]
+    F1 --> F2[Process Logic]
+    
+    %% Content Validation
+    F2 --> G[Validate Content]
+    G --> G1[Check Required Fields]
+    G1 --> G2{Content Valid?}
+    
+    %% Save Process
+    G2 -->|Valid| H[Save Note]
+    H --> H1[Write File]
+    H1 --> H2[Update Index]
+    
+    %% Error Handling
+    G2 -->|Invalid| I[Error Handling]
+    I --> I1[Log Error]
+    I1 --> I2[Notify User]
+```
+
+## Tag Management Flow
+
+```mermaid
+graph TD
+    %% Tag Operation Processing
+    A[Tag Operation] --> A1[Validate Tag]
+    A1 --> A2[Check Permissions]
+    A2 --> B{Operation Type}
+    
+    %% Add Tag Process
+    B -->|Add| C[Validate Tag]
+    C --> C1[Check Format]
+    C1 --> C2[Check Duplicates]
+    
+    %% Remove Tag Process
+    B -->|Remove| D[Check Existence]
+    D --> D1[Find References]
+    D1 --> D2[Check Dependencies]
+    
+    %% Update Process
+    C2 --> E[Update Frontmatter]
+    D2 --> E
+    E --> E1[Parse YAML]
+    E1 --> E2[Modify Tags]
+    
+    %% File Operations
+    E2 --> F[Update Note]
+    F --> F1[Write Changes]
+    F1 --> F2[Verify Update]
+    
+    %% Index Updates
+    F2 --> G[Update Index]
+    G --> G1[Update Search]
+    G1 --> G2[Update Relations]
+    
+    %% Tag Database
+    G2 --> H[Update Tag Database]
+    H --> H1[Update Statistics]
+    H1 --> H2[Update UI]
+```
+
+## Semantic Analysis Flow
+
+```mermaid
+graph TD
+    %% Initial Processing
+    A[Analysis Request] --> A1[Validate Request]
+    A1 --> A2[Load Configuration]
+    A2 --> B[Extract Content]
+    
+    %% Content Processing
+    B --> B1[Parse Markdown]
+    B1 --> B2[Clean Content]
+    B2 --> C[Process Markdown]
+    
+    %% Entity Extraction
+    C --> D[Extract Entities]
+    D --> D1[Named Entities]
+    D1 --> D2[Custom Entities]
+    D2 --> E[Find Relationships]
+    
+    %% Relationship Analysis
+    E --> E1[Direct Links]
+    E1 --> E2[Implicit Links]
+    E2 --> E3[Calculate Weights]
+    
+    %% Graph Generation
+    E3 --> F[Generate Graph]
+    F --> F1[Create Nodes]
+    F1 --> F2[Create Edges]
+    F2 --> F3[Apply Layout]
+    
+    %% Storage
+    F3 --> G[Store Results]
+    G --> G1[Save Graph]
+    G1 --> G2[Cache Results]
+    
+    %% Metadata Update
+    G2 --> H[Update Metadata]
+    H --> H1[Update Stats]
+    H1 --> H2[Update UI]
+```
+
+## Vault Indexing Flow
+
+```mermaid
+graph TD
+    %% Initial Setup
+    A[Index Request] --> A1[Check Lock]
+    A1 --> A2[Create Backup]
+    A2 --> B[Scan Vault]
+    
+    %% File Discovery
+    B --> B1[List Files]
+    B1 --> B2[Filter Files]
+    B2 --> C[Process Files]
+    
+    %% Content Processing
+    C --> C1[Read Files]
+    C1 --> C2[Parse Content]
+    C2 --> D[Extract Content]
+    
+    %% Chunking
+    D --> D1[Split Content]
+    D1 --> D2[Clean Chunks]
+    D2 --> E[Generate Chunks]
+    
+    %% Embedding Generation
+    E --> E1[Process Chunks]
+    E1 --> E2[Create Embeddings]
+    E2 --> F[Create Embeddings]
+    
+    %% Storage
+    F --> F1[Batch Process]
+    F1 --> F2[Store Vectors]
+    F2 --> G[Store in Vector DB]
+    
+    %% Metadata
+    G --> G1[Update Links]
+    G1 --> G2[Update Tags]
+    G2 --> H[Update Metadata]
+    
+    %% Statistics
+    H --> H1[Calculate Stats]
+    H1 --> H2[Generate Report]
+    H2 --> I[Generate Index Stats]
+    
+    %% Cleanup
+    I --> J[Release Lock]
+    J --> K[Notify Complete]
+```
+
+## Plugin Integration Flow
+
+```mermaid
+graph TD
+    %% Event Reception
+    A[Plugin Event] --> A1[Validate Event]
+    A1 --> A2[Check Permissions]
+    A2 --> B{Event Type}
+    
+    %% Note Change Handling
+    B -->|Note Change| C[Process Change]
+    C --> C1[Detect Changes]
+    C1 --> C2[Apply Rules]
+    C2 --> F[Update State]
+    
+    %% User Action Handling
+    B -->|User Action| D[Handle Action]
+    D --> D1[Validate Action]
+    D1 --> D2[Execute Action]
+    D2 --> F
+    
+    %% System Event Handling
+    B -->|System Event| E[System Handler]
+    E --> E1[Log Event]
+    E1 --> E2[Process Event]
+    E2 --> F
+    
+    %% State Management
+    F --> F1[Update Cache]
+    F1 --> F2[Sync State]
+    F2 --> G[Trigger Updates]
+    
+    %% Update Processing
+    G --> G1[Queue Updates]
+    G1 --> G2[Process Queue]
+    G2 --> H[Notify User]
+    
+    %% User Notification
+    H --> H1[Format Message]
+    H1 --> H2[Send Notification]
+    H2 --> I[Update UI]
+```
+
+## Error Handling Flow
+
+```mermaid
+graph TD
+    %% Error Detection
+    A[Error Occurs] --> A1[Capture Error]
+    A1 --> A2[Get Context]
+    A2 --> B{Error Type}
+    
+    %% File System Errors
+    B -->|File System| C[Handle FS Error]
+    C --> C1[Check Permissions]
+    C1 --> C2[Verify Path]
+    C2 --> G[Log Error]
+    
+    %% Network Errors
+    B -->|Network| D[Handle Network Error]
+    D --> D1[Check Connection]
+    D1 --> D2[Verify Endpoint]
+    D2 --> G
+    
+    %% API Errors
+    B -->|API| E[Handle API Error]
+    E --> E1[Check Status]
+    E1 --> E2[Parse Response]
+    E2 --> G
+    
+    %% Validation Errors
+    B -->|Validation| F[Handle Validation]
+    F --> F1[Check Schema]
+    F1 --> F2[Validate Data]
+    F2 --> G
+    
+    %% Error Logging
+    G --> G1[Format Error]
+    G1 --> G2[Save Log]
+    G2 --> H[Notify User]
+    
+    %% Recovery Process
+    H --> I{Can Retry?}
+    I -->|Yes| J[Retry Operation]
+    J --> J1[Backoff Delay]
+    J1 --> J2[Execute Retry]
+    
+    %% Error Resolution
+    I -->|No| K[Show Error Details]
+    K --> K1[Display Message]
+    K1 --> K2[Suggest Action]
+    
+    %% Final Handling
+    J2 --> L[Update Status]
+    K2 --> L
+    L --> M[Complete Handling]
+```
+
+## Authentication and Authorization Flow
+
+```mermaid
+graph TD
+    %% Initial Request
+    A[Auth Request] --> A1[Validate Request Format]
+    A1 --> A2[Parse Credentials]
+    A2 --> B{Auth Type}
+    
+    %% API Key Auth
+    B -->|API Key| C[Validate API Key]
+    C --> C1[Check Key Format]
+    C1 --> C2[Verify Key]
+    C2 --> G[Generate Token]
+    
+    %% Token Auth
+    B -->|Token| D[Validate Token]
+    D --> D1[Check Token Format]
+    D1 --> D2[Verify Signature]
+    D2 --> D3[Check Expiration]
+    D3 --> G
+    
+    %% Session Auth
+    B -->|Session| E[Validate Session]
+    E --> E1[Check Session ID]
+    E1 --> E2[Verify Session]
+    E2 --> G
+    
+    %% Token Generation
+    G --> G1[Create JWT]
+    G1 --> G2[Set Claims]
+    G2 --> H[Return Token]
+    
+    %% Authorization
+    H --> I[Check Permissions]
+    I --> I1[Load User Role]
+    I1 --> I2[Check Access Level]
+    I2 --> J{Authorized?}
+    
+    %% Access Control
+    J -->|Yes| K[Grant Access]
+    J -->|No| L[Deny Access]
+    
+    %% Logging
+    K --> M[Log Access]
+    L --> M
+    M --> N[Update Metrics]
+```
+
+## Search and Discovery Flow
+
+```mermaid
+graph TD
+    %% Search Request
+    A[Search Request] --> A1[Parse Query]
+    A1 --> A2[Validate Parameters]
+    A2 --> B[Query Router]
+    
+    %% Query Processing
+    B --> C{Search Type}
+    
+    %% Full Text Search
+    C -->|Full Text| D[Text Search]
+    D --> D1[Tokenize Query]
+    D1 --> D2[Apply Filters]
+    D2 --> G[Merge Results]
+    
+    %% Semantic Search
+    C -->|Semantic| E[Vector Search]
+    E --> E1[Generate Embeddings]
+    E1 --> E2[Find Similar]
+    E2 --> G
+    
+    %% Tag Search
+    C -->|Tags| F[Tag Search]
+    F --> F1[Parse Tags]
+    F1 --> F2[Match Tags]
+    F2 --> G
+    
+    %% Result Processing
+    G --> H[Rank Results]
+    H --> H1[Apply Boosts]
+    H1 --> H2[Sort Results]
+    
+    %% Result Enhancement
+    H2 --> I[Enhance Results]
+    I --> I1[Add Metadata]
+    I1 --> I2[Add Previews]
+    
+    %% Response Formation
+    I2 --> J[Format Response]
+    J --> J1[Add Pagination]
+    J1 --> J2[Add Facets]
+    
+    %% Caching
+    J2 --> K[Cache Results]
+    K --> L[Return Results]
+```
+
+## Task Management Flow
+
+```mermaid
+graph TD
+    %% Task Creation
+    A[Task Source] --> A1{Source Type}
+    
+    %% Note Tasks
+    A1 -->|Note| B[Extract from Note]
+    B --> B1[Parse Markdown]
+    B1 --> B2[Find Task Markers]
+    
+    %% Audio Tasks
+    A1 -->|Audio| C[Extract from Audio]
+    C --> C1[Process Transcript]
+    C1 --> C2[Identify Actions]
+    
+    %% Email Tasks
+    A1 -->|Email| D[Extract from Email]
+    D --> D1[Parse Content]
+    D1 --> D2[Find Action Items]
+    
+    %% Task Processing
+    B2 --> E[Task Processor]
+    C2 --> E
+    D2 --> E
+    
+    %% Task Enhancement
+    E --> F[Enhance Task]
+    F --> F1[Add Due Date]
+    F1 --> F2[Set Priority]
+    F2 --> F3[Add Context]
+    
+    %% Task Organization
+    F3 --> G[Organize Tasks]
+    G --> G1[Group by Project]
+    G1 --> G2[Sort by Priority]
+    
+    %% Task Storage
+    G2 --> H[Store Task]
+    H --> H1[Update Index]
+    H1 --> H2[Create Links]
+    
+    %% Notifications
+    H2 --> I[Notify]
+    I --> I1[Send Reminders]
+    I1 --> I2[Update UI]
+```
+
+## Configuration Management Flow
+
+```mermaid
+graph TD
+    %% Config Loading
+    A[Load Config] --> A1[Read Config Files]
+    A1 --> A2[Parse YAML]
+    A2 --> B[Validate Config]
+    
+    %% Validation Process
+    B --> B1[Check Required Fields]
+    B1 --> B2[Validate Types]
+    B2 --> B3[Verify Values]
+    
+    %% Environment Processing
+    B3 --> C[Process Environment]
+    C --> C1[Load Env Vars]
+    C1 --> C2[Override Config]
+    
+    %% Secret Management
+    C2 --> D[Process Secrets]
+    D --> D1[Load Secrets]
+    D1 --> D2[Decrypt Values]
+    
+    %% Config Application
+    D2 --> E[Apply Config]
+    E --> E1[Update Services]
+    E1 --> E2[Notify Changes]
+    
+    %% Validation
+    E2 --> F[Verify Config]
+    F --> F1[Test Connections]
+    F1 --> F2[Check Services]
+    
+    %% Status Update
+    F2 --> G{Config Valid?}
+    G -->|Yes| H[Apply Changes]
+    G -->|No| I[Rollback]
+    
+    %% Finalization
+    H --> J[Update Status]
+    I --> J
+    J --> K[Notify Complete]
+```
+
+## Plugin Management Flow
+
+```mermaid
+graph TD
+    %% Plugin Loading
+    A[Plugin Event] --> A1[Load Plugin]
+    A1 --> A2[Verify Signature]
+    A2 --> B{Plugin State}
+    
+    %% Installation
+    B -->|Install| C[Install Plugin]
+    C --> C1[Download Files]
+    C1 --> C2[Verify Files]
+    C2 --> C3[Extract Files]
+    
+    %% Activation
+    B -->|Activate| D[Activate Plugin]
+    D --> D1[Load Dependencies]
+    D1 --> D2[Initialize Plugin]
+    D2 --> D3[Register Hooks]
+    
+    %% Update Process
+    B -->|Update| E[Update Plugin]
+    E --> E1[Check Version]
+    E1 --> E2[Download Update]
+    E2 --> E3[Apply Update]
+    
+    %% Deactivation
+    B -->|Deactivate| F[Deactivate Plugin]
+    F --> F1[Unregister Hooks]
+    F1 --> F2[Cleanup Resources]
+    
+    %% Common Flow
+    C3 --> G[Update Registry]
+    D3 --> G
+    E3 --> G
+    F2 --> G
+    
+    %% Finalization
+    G --> H[Save State]
+    H --> I[Notify User]
+```
+
+## Knowledge Graph Flow
+
+```mermaid
+graph TD
+    %% Initial Processing
+    A[Content Update] --> A1[Parse Content]
+    A1 --> A2[Extract Entities]
+    A2 --> B[Process Entities]
+    
+    %% Entity Processing
+    B --> B1[Identify Types]
+    B1 --> B2[Extract Attributes]
+    B2 --> B3[Find Relations]
+    
+    %% Relationship Processing
+    B3 --> C[Process Relations]
+    C --> C1[Validate Relations]
+    C1 --> C2[Weight Relations]
+    C2 --> C3[Merge Relations]
+    
+    %% Graph Updates
+    C3 --> D[Update Graph]
+    D --> D1[Add Nodes]
+    D1 --> D2[Update Edges]
+    D2 --> D3[Prune Graph]
+    
+    %% Analysis
+    D3 --> E[Analyze Graph]
+    E --> E1[Calculate Metrics]
+    E1 --> E2[Find Patterns]
+    E2 --> E3[Generate Insights]
+    
+    %% Visualization
+    E3 --> F[Generate Views]
+    F --> F1[Create Layouts]
+    F1 --> F2[Apply Styling]
+    F2 --> F3[Add Interactivity]
+    
+    %% Integration
+    F3 --> G[Update UI]
+    G --> G1[Render Graph]
+    G1 --> G2[Add Controls]
+    G2 --> H[Save State]
+```
+
+## Backup and Recovery Flow
+
+```mermaid
+graph TD
+    %% Backup Initialization
+    A[Backup Trigger] --> A1{Backup Type}
+    A1 --> A2[Check Schedule]
+    A2 --> B[Prepare Backup]
+    
+    %% Full Backup
+    A1 -->|Full| C[Full Backup]
+    C --> C1[Create Snapshot]
+    C1 --> C2[Compress Files]
+    C2 --> F[Store Backup]
+    
+    %% Incremental Backup
+    A1 -->|Incremental| D[Incremental Backup]
+    D --> D1[Find Changes]
+    D1 --> D2[Backup Changes]
+    D2 --> F
+    
+    %% Metadata Backup
+    A1 -->|Metadata| E[Metadata Backup]
+    E --> E1[Export Settings]
+    E1 --> E2[Export Indexes]
+    E2 --> F
+    
+    %% Storage Process
+    F --> F1[Generate Checksum]
+    F1 --> F2[Encrypt Backup]
+    F2 --> F3[Upload Backup]
+    
+    %% Verification
+    F3 --> G[Verify Backup]
+    G --> G1[Check Integrity]
+    G1 --> G2[Validate Content]
+    
+    %% Recovery Process
+    G2 --> H{Need Recovery?}
+    H -->|Yes| I[Restore Backup]
+    I --> I1[Download Backup]
+    I1 --> I2[Verify Checksum]
+    I2 --> I3[Restore Files]
+    
+    %% Cleanup
+    H -->|No| J[Cleanup]
+    I3 --> J
+    J --> J1[Remove Old Backups]
+    J1 --> J2[Update Registry]
+    J2 --> K[Notify Complete]
+``` 

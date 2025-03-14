@@ -360,137 +360,25 @@ class NoteManagementAgent(ToolCallingAgent):
 
             # Initialize all available tools
             try:
-                tools = [
-                    # Note Management Tools
-                    CreateNoteTool(vault_path),
-                    DeleteNoteTool(vault_path),
-                    ListNotesTool(vault_path),
-                    SearchNotesTool(vault_path),
-                    UpdateNoteTool(vault_path),
-                    
-                    # Folder Management Tools
-                    CreateFolderTool(vault_path),
-                    DeleteFolderTool(vault_path),
-                    MoveFolderTool(vault_path),
-                    ListFoldersTool(vault_path),
-                    GetFolderContentsTool(vault_path),
-                    
-                    # Tag Management Tools
-                    TagManagerTool(vault_path),
-                    
-                    # Template Management Tools
-                    CreateTemplateTool(vault_path),
-                    DeleteTemplateTool(vault_path),
-                    ListTemplatesTool(vault_path),
-                    ApplyTemplateTool(vault_path),
-                    GetTemplateContentTool(vault_path),
-                    
-                    # Audio Processing Tools
-                    TranscribeAudioTool(vault_path),
-                    ListAudioFilesTool(vault_path),
-                    GetTranscriptionNoteTool(vault_path),
-                    
-                    # Email Processing Tools
-                    ProcessEmailTool(vault_path),
-                    ListEmailFilesTool(vault_path),
-                    GetEmailNoteTool(vault_path),
-                    
-                    # Indexing and Search Tools
-                    IndexNoteTool(vault_path),
-                    ClusterNotesTool(vault_path),
-                    
-                    # Semantic Analysis Tools
-                    AnalyzeRelationshipsTool(vault_path),
-                    FindRelatedNotesTool(vault_path),
-                    GenerateKnowledgeGraphTool(vault_path),
-                    
-                    # Vault Reorganization Tools
-                    AnalyzeVaultStructureTool(vault_path),
-                    ReorganizeVaultTool(vault_path),
-                    SuggestOrganizationTool(vault_path),
-                    
-                    # Hierarchy Management Tools
-                    HierarchyManagerTool(vault_path),
-                    
-                    # Additional Tools
-                    OpenNoteTool(vault_path),
-                    TriggerServiceTool(vault_path)
-                ]
+                tools = self._initialize_tools()
                 logger.info("Successfully initialized all tools")
             except Exception as e:
                 logger.error(f"Failed to initialize tools: {str(e)}")
                 raise NoteManagementError(f"Failed to initialize tools: {str(e)}")
 
-            # Initialize parent class
-            try:
-                super().__init__(
-                    model=LiteLLMModel(
-                        model_id="gpt-4",
-                        api_key=os.getenv("OPENAI_API_KEY"),
-                        temperature=0.7,
-                        max_tokens=1000,
-                        request_timeout=30
-                    ),
-                    tools=tools,
-                    system_prompt="""You are DiscoSui, an intelligent assistant for managing Obsidian vaults.
-                    Your role is to help users interact with their notes through natural language.
-                    
-                    Available Capabilities:
-                    1. Note Management:
-                       - Create, update, and delete notes
-                       - Search for notes using semantic search
-                       - List and organize notes
-                       - Apply templates to notes
-                    
-                    2. Folder Management:
-                       - Create, delete, and move folders
-                       - List folder contents
-                       - Organize notes in folders
-                    
-                    3. Tag Management:
-                       - Add, remove, and search by tags
-                       - Get tag statistics
-                       - Find related tags
-                       - Suggest tags based on content
-                    
-                    4. Template Management:
-                       - Create and manage templates
-                       - Apply templates to notes
-                       - Validate template usage
-                    
-                    5. Content Processing:
-                       - Transcribe audio files to notes
-                       - Process and organize emails
-                       - Generate knowledge graphs
-                       - Analyze relationships between notes
-                    
-                    6. Vault Organization:
-                       - Analyze vault structure
-                       - Suggest organization improvements
-                       - Reorganize content
-                       - Maintain hierarchy
-                    
-                    7. Semantic Analysis:
-                       - Find related notes
-                       - Analyze content relationships
-                       - Generate insights
-                       - Answer questions using RAG
-                    
-                    Always:
-                    1. Maintain a conversational tone
-                    2. Provide helpful, context-aware responses
-                    3. Ask for clarification when needed
-                    4. Follow vault structure and templates
-                    5. Consider opening relevant notes automatically
-                    6. Use appropriate tools for each task
-                    7. Handle errors gracefully
-                    8. Provide clear feedback and next steps"""
-                )
-                logger.info("Successfully initialized parent class")
-            except Exception as e:
-                logger.error(f"Failed to initialize parent class: {str(e)}")
-                raise NoteManagementError(f"Failed to initialize parent class: {str(e)}")
-
+            # Initialize parent class with smolagents configuration
+            super().__init__(
+                model=LiteLLMModel(
+                    model_id="gpt-4",
+                    api_key=os.getenv("OPENAI_API_KEY"),
+                    temperature=0.7,
+                    max_tokens=1000,
+                    request_timeout=30
+                ),
+                tools=tools,
+                system_prompt=self._get_system_prompt()
+            )
+            
             # Setup plugin and initialize knowledge base
             self._ensure_plugin_setup()
             self._initialize_knowledge_base()
@@ -502,6 +390,125 @@ class NoteManagementAgent(ToolCallingAgent):
         except Exception as e:
             logger.error(f"Failed to initialize NoteManagementAgent: {str(e)}")
             raise NoteManagementError(f"Failed to initialize NoteManagementAgent: {str(e)}")
+
+    def _initialize_tools(self) -> List[Tool]:
+        """Initialize all available tools following smolagents Tool interface."""
+        try:
+            return [
+                # Note Management Tools
+                CreateNoteTool(self.vault_path),
+                DeleteNoteTool(self.vault_path),
+                ListNotesTool(self.vault_path),
+                SearchNotesTool(self.vault_path),
+                UpdateNoteTool(self.vault_path),
+                
+                # Folder Management Tools
+                CreateFolderTool(self.vault_path),
+                DeleteFolderTool(self.vault_path),
+                MoveFolderTool(self.vault_path),
+                ListFoldersTool(self.vault_path),
+                GetFolderContentsTool(self.vault_path),
+                
+                # Tag Management Tools
+                TagManagerTool(self.vault_path),
+                
+                # Template Management Tools
+                CreateTemplateTool(self.vault_path),
+                DeleteTemplateTool(self.vault_path),
+                ListTemplatesTool(self.vault_path),
+                ApplyTemplateTool(self.vault_path),
+                GetTemplateContentTool(self.vault_path),
+                
+                # Audio Processing Tools
+                TranscribeAudioTool(self.vault_path),
+                ListAudioFilesTool(self.vault_path),
+                GetTranscriptionNoteTool(self.vault_path),
+                
+                # Email Processing Tools
+                ProcessEmailTool(self.vault_path),
+                ListEmailFilesTool(self.vault_path),
+                GetEmailNoteTool(self.vault_path),
+                
+                # Indexing and Search Tools
+                IndexNoteTool(self.vault_path),
+                ClusterNotesTool(self.vault_path),
+                
+                # Semantic Analysis Tools
+                AnalyzeRelationshipsTool(self.vault_path),
+                FindRelatedNotesTool(self.vault_path),
+                GenerateKnowledgeGraphTool(self.vault_path),
+                
+                # Vault Organization Tools
+                AnalyzeVaultStructureTool(self.vault_path),
+                ReorganizeVaultTool(self.vault_path),
+                SuggestOrganizationTool(self.vault_path),
+                
+                # Hierarchy Management Tools
+                HierarchyManagerTool(self.vault_path),
+                
+                # Additional Tools
+                OpenNoteTool(self.vault_path),
+                TriggerServiceTool(self.vault_path)
+            ]
+        except Exception as e:
+            logger.error(f"Failed to initialize tools: {str(e)}")
+            raise NoteManagementError(f"Failed to initialize tools: {str(e)}")
+
+    def _get_system_prompt(self) -> str:
+        """Get the system prompt for the agent."""
+        return """You are DiscoSui, an intelligent assistant for managing Obsidian vaults.
+        Your role is to help users interact with their notes through natural language.
+        
+        Available Capabilities:
+        1. Note Management:
+           - Create, update, and delete notes
+           - Search for notes using semantic search
+           - List and organize notes
+           - Apply templates to notes
+        
+        2. Folder Management:
+           - Create, delete, and move folders
+           - List folder contents
+           - Organize notes in folders
+        
+        3. Tag Management:
+           - Add, remove, and search by tags
+           - Get tag statistics
+           - Find related tags
+           - Suggest tags based on content
+        
+        4. Template Management:
+           - Create and manage templates
+           - Apply templates to notes
+           - Validate template usage
+        
+        5. Content Processing:
+           - Transcribe audio files to notes
+           - Process and organize emails
+           - Generate knowledge graphs
+           - Analyze relationships between notes
+        
+        6. Vault Organization:
+           - Analyze vault structure
+           - Suggest organization improvements
+           - Reorganize content
+           - Maintain hierarchy
+        
+        7. Semantic Analysis:
+           - Find related notes
+           - Analyze content relationships
+           - Generate insights
+           - Answer questions using RAG
+        
+        Always:
+        1. Maintain a conversational tone
+        2. Provide helpful, context-aware responses
+        3. Ask for clarification when needed
+        4. Follow vault structure and templates
+        5. Consider opening relevant notes automatically
+        6. Use appropriate tools for each task
+        7. Handle errors gracefully
+        8. Provide clear feedback and next steps"""
 
     def _initialize_knowledge_base(self):
         """Initialize the knowledge base by indexing all notes.
@@ -588,184 +595,26 @@ class NoteManagementAgent(ToolCallingAgent):
         except Exception as e:
             logger.error(f"Failed to track tool usage: {str(e)}")
 
-    async def process_message(self, message: str) -> Dict[str, Any]:
-        """Process a natural language message and return an appropriate response.
-        
-        Args:
-            message (str): The user's message to process
-            
-        Returns:
-            Dict[str, Any]: The response containing success status, message, and any relevant data
-            
-        Raises:
-            NoteManagementError: If message processing fails
-        """
-        try:
-            logger.info(f"Processing message: {message}")
-            
-            # Use the LLM to understand the intent
-            try:
-                intent_response = await self.model.generate(self._create_intent_prompt(message))
-                intent_data = intent_response.json()
-                logger.info(f"Successfully analyzed message intent: {intent_data['intent']}")
-            except Exception as e:
-                logger.error(f"Failed to analyze message intent: {str(e)}")
-                raise NoteManagementError(f"Failed to analyze message intent: {str(e)}")
-
-            # Create NoteRequest object
-            try:
-                note_request = NoteRequest(**intent_data["parameters"])
-                logger.info("Successfully created note request")
-            except Exception as e:
-                logger.error(f"Failed to create note request: {str(e)}")
-                raise NoteManagementError(f"Failed to create note request: {str(e)}")
-
-            # Track tool usage and process the request
-            result = await self._process_intent(intent_data, note_request)
-            logger.info("Successfully processed message")
-            return result
-
-        except Exception as e:
-            logger.error(f"Failed to process message: {str(e)}")
-            return self._format_error_response(str(e), "An error occurred while processing your request")
-
-    def _create_intent_prompt(self, message: str) -> str:
-        """Create the prompt for intent analysis.
-        
-        Args:
-            message (str): The user's message
-            
-        Returns:
-            str: The formatted prompt for intent analysis
-        """
-        return f"""Analyze the following user message and determine:
-        1. The primary intent (create, read, update, delete, search, analyze, question, organize, process)
-        2. Any relevant parameters (title, content, folder, tags, template)
-        3. Any additional context or requirements
-        4. Whether any notes should be automatically opened
-        5. Which specific tools would be most appropriate
-        6. Any potential errors or edge cases to handle
-
-        Message: {message}
-
-        Format your response as JSON with the following structure:
-        {{
-            "intent": "string",
-            "parameters": {{
-                "title": "string or null",
-                "content": "string or null",
-                "folder": "string or null",
-                "tags": ["string"],
-                "template": "string or null"
-            }},
-            "context": "string",
-            "auto_open_notes": ["string"],
-            "recommended_tools": ["string"],
-            "potential_errors": ["string"]
-        }}"""
-
-    async def _process_intent(self, intent_data: Dict[str, Any], note_request: NoteRequest) -> Dict[str, Any]:
-        """Process the analyzed intent and execute appropriate actions.
-        
-        Args:
-            intent_data (Dict[str, Any]): The analyzed intent data
-            note_request (NoteRequest): The note request object
-            
-        Returns:
-            Dict[str, Any]: The response containing success status, message, and any relevant data
-            
-        Raises:
-            NoteManagementError: If intent processing fails
-        """
-        try:
-            # Track tool usage
-            for tool_name in intent_data.get("recommended_tools", []):
-                self._track_tool_usage(tool_name, True)
-
-            # Handle question intent
-            if intent_data["intent"] == "question":
-                return await self._handle_question_intent(message, intent_data)
-
-            # Handle other intents
-            return await self._handle_general_intent(intent_data, note_request)
-
-        except Exception as e:
-            logger.error(f"Failed to process intent: {str(e)}")
-            raise NoteManagementError(f"Failed to process intent: {str(e)}")
-
-    def _format_response(self, result: Dict[str, Any], context: str) -> Dict[str, Any]:
-        """Format the tool response into a conversational message.
-        
-        Args:
-            result (Dict[str, Any]): The raw result from tool execution
-            context (str): The context of the request
-            
-        Returns:
-            Dict[str, Any]: The formatted response
-        """
-        try:
-            if not result.get("success", False):
-                logger.warning(f"Tool execution failed: {result.get('error', 'Unknown error')}")
-                return self._format_error_response(result.get("error", "Unknown error"), context)
-
-            response = self.model.generate(self._create_response_prompt(result, context))
-            logger.info("Successfully formatted response")
-            
-            return {
-                "success": True,
-                "response": response,
-                "context": context,
-                "data": result
-            }
-        except Exception as e:
-            logger.error(f"Failed to format response: {str(e)}")
-            return self._format_error_response(str(e), context)
-
-    def _format_error_response(self, error: str, context: str) -> Dict[str, Any]:
-        """Format an error response with helpful suggestions.
-        
-        Args:
-            error (str): The error message
-            context (str): The context of the request
-            
-        Returns:
-            Dict[str, Any]: The formatted error response
-        """
-        logger.error(f"Formatting error response: {error}")
-        return {
-            "success": False,
-            "error": error,
-            "response": f"I encountered an error: {error}. {context}",
-            "suggestions": [
-                "Please check if all required parameters are provided",
-                "Verify that the note or folder exists",
-                "Ensure you have the necessary permissions",
-                "Try rephrasing your request"
-            ]
-        }
-
-    def get_tool_usage_stats(self) -> Dict[str, Any]:
-        """Get statistics about tool usage.
-        
-        Returns:
-            Dict[str, Any]: Tool usage statistics
-        """
-        return self.tool_usage_stats
-
     async def run(self, task: str) -> Union[Dict[str, Any], str]:
-        """Run the agent on a given task.
-        
-        Args:
-            task (str): The task to run
-            
-        Returns:
-            Union[Dict[str, Any], str]: The result of running the task
-        """
+        """Run the agent on a given task following smolagents execution flow."""
         try:
             logger.info(f"Running task: {task}")
-            result = await self.process_message(task)
+            
+            # Execute task using smolagents run method
+            result = await super().run(task)
+            
+            # Track tool usage
+            if isinstance(result, dict) and "tool_calls" in result:
+                for tool_call in result["tool_calls"]:
+                    self._track_tool_usage(
+                        tool_call["tool"],
+                        tool_call.get("success", False),
+                        tool_call.get("error")
+                    )
+                    
             logger.info("Successfully completed task")
             return result
+            
         except Exception as e:
             logger.error(f"Failed to run task: {str(e)}")
             return {
@@ -773,3 +622,7 @@ class NoteManagementAgent(ToolCallingAgent):
                 "error": str(e),
                 "response": "I encountered an error while processing your request. Could you please try again?"
             }
+
+    def get_tool_usage_stats(self) -> Dict[str, Any]:
+        """Get statistics about tool usage."""
+        return self.tool_usage_stats

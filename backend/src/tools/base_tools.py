@@ -15,12 +15,16 @@ from src.core.exceptions import (
     FrontmatterError,
     ToolError
 )
+from datetime import datetime
+import yaml
+import jsonschema
 
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
+logger = logging.getLogger(__name__)
 
 class ToolResponse(BaseModel):
     """Base model for tool responses."""
@@ -31,513 +35,530 @@ class ToolResponse(BaseModel):
     execution_time: Optional[float] = Field(None, description="Time taken to execute the tool in seconds")
 
 class BaseTool(Tool):
-    """Base class for all tools with common functionality."""
+    """Base class for all DiscoSui tools following smolagents Tool interface."""
     
-    def __init__(self, vault_path: Optional[str] = None):
-        """Initialize the base tool.
+    def __init__(self):
+        """Initialize the base tool."""
+        super().__init__()
+        self.logger = logging.getLogger(self.__class__.__name__)
+        
+    async def execute(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute the tool with the given parameters.
+        
+        This method follows the smolagents Tool interface for execution.
         
         Args:
-            vault_path (Optional[str]): Path to the Obsidian vault. If None, will be loaded from config.
+            parameters (Dict[str, Any]): The parameters for tool execution
+            
+        Returns:
+            Dict[str, Any]: The execution result
             
         Raises:
-            FileSystemError: If vault path is invalid or inaccessible
+            ToolError: If tool execution fails
         """
+        try:
+            # Validate parameters
+            self._validate_parameters(parameters)
+            
+            # Execute tool-specific logic
+            result = await self._execute_tool(parameters)
+            
+            # Format response
+            return self._format_response(result)
+            
+        except Exception as e:
+            self.logger.error(f"Tool execution failed: {str(e)}")
+            return self._format_error(str(e))
+            
+    def _validate_parameters(self, parameters: Dict[str, Any]) -> None:
+        """Validate input parameters against tool schema.
+        
+        Args:
+            parameters (Dict[str, Any]): Parameters to validate
+            
+        Raises:
+            ValidationError: If parameters are invalid
+        """
+        try:
+            # Get tool schema
+            schema = self.get_schema()
+            
+            # Check required parameters
+            for param_name, param_info in schema["inputs"].items():
+                if param_info.get("required", False) and param_name not in parameters:
+                    raise ValidationError(f"Missing required parameter: {param_name}")
+                    
+            # Validate parameter types
+            for param_name, param_value in parameters.items():
+                if param_name in schema["inputs"]:
+                    param_info = schema["inputs"][param_name]
+                    if not self._validate_parameter_type(param_value, param_info["type"]):
+                        raise ValidationError(
+                            f"Invalid type for parameter {param_name}. "
+                            f"Expected {param_info['type']}, got {type(param_value)}"
+                        )
+                        
+        except Exception as e:
+            raise ValidationError(f"Parameter validation failed: {str(e)}")
+            
+    def _validate_parameter_type(self, value: Any, expected_type: str) -> bool:
+        """Validate a parameter's type.
+        
+        Args:
+            value (Any): The value to validate
+            expected_type (str): The expected type
+            
+        Returns:
+            bool: Whether the type is valid
+        """
+        type_map = {
+            "string": str,
+            "integer": int,
+            "number": (int, float),
+            "boolean": bool,
+            "array": list,
+            "object": dict
+        }
+        
+        if expected_type not in type_map:
+            return True  # Skip validation for unknown types
+            
+        expected_python_type = type_map[expected_type]
+        return isinstance(value, expected_python_type)
+        
+    async def _execute_tool(self, parameters: Dict[str, Any]) -> Any:
+        """Execute tool-specific logic.
+        
+        This method should be overridden by tool implementations.
+        
+        Args:
+            parameters (Dict[str, Any]): The validated parameters
+            
+        Returns:
+            Any: The tool execution result
+            
+        Raises:
+            NotImplementedError: If not overridden
+        """
+        raise NotImplementedError("Tool implementation must override _execute_tool method")
+        
+    def _format_response(self, result: Any) -> Dict[str, Any]:
+        """Format the tool execution result.
+        
+        Args:
+            result (Any): The raw execution result
+            
+        Returns:
+            Dict[str, Any]: The formatted response
+        """
+        return {
+            "success": True,
+            "result": result,
+            "metadata": {
+                "tool_name": self.name,
+                "timestamp": datetime.now().isoformat()
+            }
+        }
+        
+    def _format_error(self, error: str) -> Dict[str, Any]:
+        """Format an error response.
+        
+        Args:
+            error (str): The error message
+            
+        Returns:
+            Dict[str, Any]: The formatted error response
+        """
+        return {
+            "success": False,
+            "error": error,
+            "metadata": {
+                "tool_name": self.name,
+                "timestamp": datetime.now().isoformat()
+            }
+        }
+        
+    def get_schema(self) -> Dict[str, Any]:
+        """Get the tool's schema.
+        
+        This method follows the smolagents Tool interface for schema definition.
+        
+        Returns:
+            Dict[str, Any]: The tool schema
+        """
+        return {
+            "name": self.name,
+            "description": self.description,
+            "inputs": self.inputs,
+            "output_type": self.output_type
+        }
+        
+    @property
+    def name(self) -> str:
+        """Get the tool's name.
+        
+        Returns:
+            str: The tool name
+        """
+        raise NotImplementedError("Tool implementation must define name property")
+        
+    @property
+    def description(self) -> str:
+        """Get the tool's description.
+        
+        Returns:
+            str: The tool description
+        """
+        raise NotImplementedError("Tool implementation must define description property")
+        
+    @property
+    def inputs(self) -> Dict[str, Any]:
+        """Get the tool's input schema.
+        
+        Returns:
+            Dict[str, Any]: The input schema
+        """
+        raise NotImplementedError("Tool implementation must define inputs property")
+        
+    @property
+    def output_type(self) -> str:
+        """Get the tool's output type.
+        
+        Returns:
+            str: The output type
+        """
+        raise NotImplementedError("Tool implementation must define output_type property")
+
+class FrontmatterManagerTool(BaseTool):
+    """Frontmatter management tool following smolagents Tool interface."""
+    
+    def __init__(self, vault_path: str):
+        """Initialize the frontmatter manager tool."""
         super().__init__()
         self.vault_path = vault_path
-        if vault_path and not os.path.exists(vault_path):
-            raise FileSystemError(f"Vault path does not exist: {vault_path}")
-        self.logger = logging.getLogger(self.__class__.__name__)
-        self._task_queue: asyncio.Queue = asyncio.Queue()
-        self._background_tasks: List[asyncio.Task] = []
         
-    async def initialize(self) -> None:
-        """Initialize the tool asynchronously.
+    @property
+    def name(self) -> str:
+        """Get the tool name."""
+        return "frontmatter_manager"
         
-        This method should be overridden by subclasses that need async initialization.
-        """
-        pass
+    @property
+    def description(self) -> str:
+        """Get the tool description."""
+        return "Comprehensive YAML frontmatter management for Obsidian notes"
         
-    async def cleanup(self) -> None:
-        """Clean up tool resources asynchronously.
+    @property
+    def inputs(self) -> Dict[str, Any]:
+        """Get the tool input schema."""
+        return {
+            "action": {
+                "type": "string",
+                "description": "The action to perform",
+                "enum": ["get", "update", "validate", "remove_field", "search", "add_metadata", "remove_metadata", "list_metadata"],
+                "required": True
+            },
+            "path": {
+                "type": "string",
+                "description": "The path to the note (required for get, update, remove_field, add_metadata, remove_metadata)",
+                "required": False
+            },
+            "content": {
+                "type": "string",
+                "description": "The note content (required for get, update)",
+                "required": False
+            },
+            "frontmatter": {
+                "type": "object",
+                "description": "The frontmatter to update (required for update)",
+                "required": False
+            },
+            "schema": {
+                "type": "object",
+                "description": "The schema to validate against (required for validate)",
+                "required": False
+            },
+            "field": {
+                "type": "string",
+                "description": "The field to remove (required for remove_field)",
+                "required": False
+            },
+            "search_field": {
+                "type": "string",
+                "description": "The field to search by (required for search)",
+                "required": False
+            },
+            "search_value": {
+                "type": "any",
+                "description": "The value to search for (required for search)",
+                "required": False
+            },
+            "metadata": {
+                "type": "string",
+                "description": "The metadata to add/remove (required for add_metadata, remove_metadata)",
+                "required": False
+            }
+        }
         
-        This method should be overridden by subclasses that need async cleanup.
-        """
-        # Cancel any running background tasks
-        for task in self._background_tasks:
-            if not task.done():
-                task.cancel()
-                try:
-                    await task
-                except asyncio.CancelledError:
-                    pass
-        self._background_tasks.clear()
+    @property
+    def output_type(self) -> str:
+        """Get the tool output type."""
+        return "object"
         
-    async def execute(self, action: str, **kwargs) -> ToolResponse:
-        """Execute a tool action asynchronously.
+    async def _execute_tool(self, parameters: Dict[str, Any]) -> Any:
+        """Execute the frontmatter management operation.
         
         Args:
-            action (str): The action to execute
-            **kwargs: Additional arguments for the action
+            parameters (Dict[str, Any]): The validated parameters
             
         Returns:
-            ToolResponse: The result of the tool execution
+            Any: The operation result
             
         Raises:
-            ToolError: If the action fails
+            ToolError: If the operation fails
         """
-        start_time = asyncio.get_event_loop().time()
+        action = parameters["action"]
+        
         try:
-            # Validate inputs
-            self._validate_inputs(kwargs, self.get_required_fields(action))
-            
-            # Execute the action
-            handler = getattr(self, f"_{action}", None)
-            if not handler or not callable(handler):
-                raise ToolError(f"Invalid action: {action}")
+            # Execute requested action
+            if action == "get":
+                return await self._get_frontmatter(parameters)
+            elif action == "update":
+                return await self._update_frontmatter(parameters)
+            elif action == "validate":
+                return await self._validate_frontmatter(parameters)
+            elif action == "remove_field":
+                return await self._remove_field(parameters)
+            elif action == "search":
+                return await self._search_by_field(parameters)
+            elif action == "add_metadata":
+                return await self._add_metadata(parameters)
+            elif action == "remove_metadata":
+                return await self._remove_metadata(parameters)
+            elif action == "list_metadata":
+                return await self._list_metadata()
+            else:
+                raise ValueError(f"Invalid action: {action}")
                 
-            result = await handler(**kwargs)
-            execution_time = asyncio.get_event_loop().time() - start_time
-            
-            return ToolResponse(
-                success=True,
-                result=result,
-                execution_time=execution_time
-            )
-            
         except Exception as e:
-            execution_time = asyncio.get_event_loop().time() - start_time
-            self.logger.error(f"Tool execution failed: {str(e)}", exc_info=True)
-            return ToolResponse(
-                success=False,
-                error=str(e),
-                execution_time=execution_time
-            )
-            
-    def add_background_task(self, coro: Awaitable[Any]) -> asyncio.Task:
-        """Add a background task to be managed by the tool.
-        
-        Args:
-            coro: The coroutine to run in the background
-            
-        Returns:
-            asyncio.Task: The created task
-        """
-        task = asyncio.create_task(coro)
-        self._background_tasks.append(task)
-        task.add_done_callback(lambda t: self._background_tasks.remove(t))
-        return task
-        
-    async def _ensure_path_exists(self, path: str) -> None:
-        """Ensure a directory path exists asynchronously.
-        
-        Args:
-            path (str): Path to ensure exists
-            
-        Raises:
-            FileSystemError: If path cannot be created
-        """
-        try:
-            os.makedirs(path, exist_ok=True)
-        except Exception as e:
-            self.logger.error(f"Failed to create path {path}: {str(e)}")
-            raise FileSystemError(f"Failed to create path {path}: {str(e)}")
-        
-    def _get_full_path(self, relative_path: str) -> str:
-        """Get the full path for a given relative path.
-        
-        Args:
-            relative_path (str): Path relative to vault root
-            
-        Returns:
-            str: Full absolute path
-            
-        Raises:
-            ValidationError: If path is invalid
-        """
-        try:
-            full_path = os.path.join(self.vault_path, relative_path)
-            if not self._validate_path(full_path):
-                raise ValidationError(f"Invalid path: {relative_path}")
-            return full_path
-        except Exception as e:
-            raise ValidationError(f"Error processing path: {str(e)}")
-        
-    async def _read_file(self, file_path: str) -> str:
-        """Read content from a file asynchronously.
-        
-        Args:
-            file_path (str): Path to the file to read
-            
-        Returns:
-            str: File contents
-            
-        Raises:
-            NoteNotFoundError: If file does not exist
-            FileSystemError: If file cannot be read
-        """
-        try:
-            if not os.path.exists(file_path):
-                raise NoteNotFoundError(f"File not found: {file_path}")
-            with open(file_path, 'r', encoding='utf-8') as f:
-                return f.read()
-        except NoteNotFoundError:
+            self.logger.error(f"Frontmatter operation failed: {str(e)}")
             raise
-        except Exception as e:
-            self.logger.error(f"Failed to read file {file_path}: {str(e)}")
-            raise FileSystemError(f"Error reading file {file_path}: {str(e)}")
             
-    async def _write_file(self, file_path: str, content: str) -> None:
-        """Write content to a file asynchronously.
-        
-        Args:
-            file_path (str): Path to the file to write
-            content (str): Content to write
+    async def _get_frontmatter(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+        """Get frontmatter from content."""
+        content = parameters.get("content")
+        if not content:
+            raise ValueError("Content is required for get operation")
             
-        Raises:
-            FileSystemError: If file cannot be written
-        """
+        if not content.startswith('---'):
+            return {
+                "frontmatter": {},
+                "timestamp": datetime.now().isoformat()
+            }
+            
+        parts = content.split('---', 2)
+        if len(parts) < 3:
+            return {
+                "frontmatter": {},
+                "timestamp": datetime.now().isoformat()
+            }
+            
         try:
-            with open(file_path, 'w', encoding='utf-8') as f:
-                f.write(content)
-        except Exception as e:
-            self.logger.error(f"Failed to write to file {file_path}: {str(e)}")
-            raise FileSystemError(f"Error writing to file {file_path}: {str(e)}")
-            
-    async def _list_files(self, directory: str, extension: str = '.md') -> List[str]:
-        """List files with given extension in a directory asynchronously.
-        
-        Args:
-            directory (str): Directory to list files from
-            extension (str, optional): File extension to filter by. Defaults to '.md'.
-            
-        Returns:
-            List[str]: List of relative file paths
-            
-        Raises:
-            FileSystemError: If directory cannot be read
-        """
-        try:
-            files = []
-            for root, _, filenames in os.walk(directory):
-                for filename in filenames:
-                    if filename.endswith(extension):
-                        rel_path = os.path.relpath(os.path.join(root, filename), self.vault_path)
-                        files.append(rel_path)
-            return files
-        except Exception as e:
-            self.logger.error(f"Failed to list files in {directory}: {str(e)}")
-            raise FileSystemError(f"Error listing files in {directory}: {str(e)}")
-            
-    async def _get_frontmatter(self, content: str) -> Dict[str, Any]:
-        """Extract frontmatter from markdown content asynchronously.
-        
-        Args:
-            content (str): Markdown content
-            
-        Returns:
-            Dict[str, Any]: Parsed frontmatter
-            
-        Raises:
-            FrontmatterError: If frontmatter cannot be parsed
-        """
-        try:
-            if not content.startswith('---'):
-                return {}
-            
-            parts = content.split('---', 2)
-            if len(parts) < 3:
-                return {}
-                
-            frontmatter = parts[1].strip()
-            return json.loads(frontmatter)
+            frontmatter = yaml.safe_load(parts[1].strip())
+            return {
+                "frontmatter": frontmatter,
+                "timestamp": datetime.now().isoformat()
+            }
         except Exception as e:
             raise FrontmatterError(f"Error parsing frontmatter: {str(e)}")
             
-    async def _update_frontmatter(self, content: str, frontmatter: Dict[str, Any]) -> str:
-        """Update frontmatter in markdown content asynchronously.
+    async def _update_frontmatter(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+        """Update frontmatter in content."""
+        content = parameters.get("content")
+        frontmatter = parameters.get("frontmatter")
         
-        Args:
-            content (str): Original markdown content
-            frontmatter (Dict[str, Any]): New frontmatter
+        if not content or frontmatter is None:
+            raise ValueError("Content and frontmatter are required for update operation")
             
-        Returns:
-            str: Updated content
-            
-        Raises:
-            FrontmatterError: If frontmatter cannot be updated
-        """
         try:
             if not content.startswith('---'):
-                return f"---\n{json.dumps(frontmatter, indent=2)}\n---\n\n{content}"
-            
-            parts = content.split('---', 2)
-            if len(parts) < 3:
-                return f"---\n{json.dumps(frontmatter, indent=2)}\n---\n\n{content}"
-                
-            return f"---\n{json.dumps(frontmatter, indent=2)}\n---\n{parts[2]}"
+                updated_content = f"---\n{yaml.dump(frontmatter, default_flow_style=False)}---\n\n{content}"
+            else:
+                parts = content.split('---', 2)
+                if len(parts) < 3:
+                    updated_content = f"---\n{yaml.dump(frontmatter, default_flow_style=False)}---\n\n{content}"
+                else:
+                    updated_content = f"---\n{yaml.dump(frontmatter, default_flow_style=False)}---\n{parts[2]}"
+                    
+            return {
+                "content": updated_content,
+                "timestamp": datetime.now().isoformat()
+            }
         except Exception as e:
             raise FrontmatterError(f"Error updating frontmatter: {str(e)}")
             
-    def _validate_path(self, path: str) -> bool:
-        """Validate if a path is within the vault directory.
+    async def _validate_frontmatter(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+        """Validate frontmatter against schema."""
+        frontmatter = parameters.get("frontmatter")
+        schema = parameters.get("schema")
         
-        Args:
-            path (str): Path to validate
+        if frontmatter is None or schema is None:
+            raise ValueError("Frontmatter and schema are required for validate operation")
             
-        Returns:
-            bool: True if path is valid
-        """
         try:
-            full_path = os.path.abspath(path)
-            vault_path = os.path.abspath(self.vault_path)
-            return full_path.startswith(vault_path)
-        except Exception:
-            return False
-
-    def _validate_inputs(self, inputs: Dict[str, Any], required_fields: List[str]) -> None:
-        """Validate required input fields.
-        
-        Args:
-            inputs (Dict[str, Any]): Input dictionary
-            required_fields (List[str]): List of required field names
+            validator = jsonschema.Draft7Validator(schema)
+            errors = sorted(validator.iter_errors(frontmatter), key=lambda e: e.path)
             
-        Raises:
-            ValidationError: If required fields are missing
-        """
-        missing_fields = [field for field in required_fields if field not in inputs]
-        if missing_fields:
-            raise ValidationError(f"Missing required fields: {', '.join(missing_fields)}")
-
-    def get_required_fields(self, action: str) -> List[str]:
-        """Get required fields for a specific action.
-        
-        Args:
-            action (str): The action to get required fields for
-            
-        Returns:
-            List[str]: List of required field names
-        """
-        # This should be overridden by subclasses to specify required fields per action
-        return []
-
-    def get_examples(self) -> List[Dict[str, Any]]:
-        """Get example usage of the tool.
-        
-        Returns:
-            List[Dict[str, Any]]: List of example usages
-        """
-        return getattr(self, 'examples', [])
-
-    def get_documentation(self) -> Dict[str, Any]:
-        """Get comprehensive documentation for the tool.
-        
-        Returns:
-            Dict[str, Any]: Tool documentation
-        """
-        return {
-            'name': self.name,
-            'description': self.description,
-            'inputs': self.inputs,
-            'output_type': self.output_type,
-            'examples': self.get_examples(),
-            'error_handling': getattr(self, 'error_handling', {}),
-            'dependencies': getattr(self, 'dependencies', [])
-        }
-
-class FrontmatterManagerTool(BaseTool):
-    name = "frontmatter_manager"
-    description = "Comprehensive YAML frontmatter management for Obsidian notes"
-    inputs = {
-        "action": {
-            "type": "string",
-            "description": "The action to perform",
-            "enum": ["get", "update", "validate", "remove_field", "search", "add_metadata", "remove_metadata", "list_metadata"]
-        },
-        "path": {
-            "type": "string",
-            "description": "The path to the note (required for get, update, remove_field, add_metadata, remove_metadata)",
-            "nullable": True
-        },
-        "content": {
-            "type": "string",
-            "description": "The note content (required for get, update)",
-            "nullable": True
-        },
-        "frontmatter": {
-            "type": "object",
-            "description": "The frontmatter to update (required for update)",
-            "nullable": True
-        },
-        "schema": {
-            "type": "object",
-            "description": "The schema to validate against (required for validate)",
-            "nullable": True
-        },
-        "field": {
-            "type": "string",
-            "description": "The field to remove (required for remove_field)",
-            "nullable": True
-        },
-        "search_field": {
-            "type": "string",
-            "description": "The field to search by (required for search)",
-            "nullable": True
-        },
-        "search_value": {
-            "type": "any",
-            "description": "The value to search for (required for search)",
-            "nullable": True
-        },
-        "metadata": {
-            "type": "string",
-            "description": "The metadata to add/remove (required for add_metadata, remove_metadata)",
-            "nullable": True
-        }
-    }
-    output_type = "object"
-
-    def forward(self, action: str, **kwargs) -> Dict[str, Any]:
-        try:
-            if action == "get":
-                if not kwargs.get("content"):
-                    raise ValueError("Content is required for get action")
-                return self.get_frontmatter(kwargs["content"])
-            elif action == "update":
-                if not kwargs.get("content") or not kwargs.get("frontmatter"):
-                    raise ValueError("Content and frontmatter are required for update action")
-                return self.update_frontmatter(kwargs["content"], kwargs["frontmatter"])
-            elif action == "validate":
-                if not kwargs.get("frontmatter") or not kwargs.get("schema"):
-                    raise ValueError("Frontmatter and schema are required for validate action")
-                return self.validate_frontmatter(kwargs["frontmatter"], kwargs["schema"])
-            elif action == "remove_field":
-                if not kwargs.get("content") or not kwargs.get("field"):
-                    raise ValueError("Content and field are required for remove_field action")
-                return self.remove_field(kwargs["content"], kwargs["field"])
-            elif action == "search":
-                if not kwargs.get("search_field") or not kwargs.get("search_value"):
-                    raise ValueError("Search field and value are required for search action")
-                return self.search_by_field(kwargs["search_field"], kwargs["search_value"])
-            elif action == "add_metadata":
-                if not kwargs.get("path") or not kwargs.get("metadata"):
-                    raise ValueError("Path and metadata are required for add_metadata action")
-                return self.add_metadata(kwargs["path"], kwargs["metadata"])
-            elif action == "remove_metadata":
-                if not kwargs.get("path") or not kwargs.get("metadata"):
-                    raise ValueError("Path and metadata are required for remove_metadata action")
-                return self.remove_metadata(kwargs["path"], kwargs["metadata"])
-            elif action == "list_metadata":
-                return self.list_metadata()
-            else:
-                raise ValueError(f"Invalid action: {action}")
+            return {
+                "is_valid": len(errors) == 0,
+                "errors": [str(error) for error in errors],
+                "timestamp": datetime.now().isoformat()
+            }
         except Exception as e:
-            return {"error": str(e)}
-
-    def get_frontmatter(self, content: str) -> Dict[str, Any]:
-        """Extract frontmatter from markdown content."""
+            raise FrontmatterError(f"Error validating frontmatter: {str(e)}")
+            
+    async def _remove_field(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+        """Remove field from frontmatter."""
+        content = parameters.get("content")
+        field = parameters.get("field")
+        
+        if not content or not field:
+            raise ValueError("Content and field are required for remove_field operation")
+            
         try:
-            if not content.startswith('---'):
-                return {}
+            frontmatter_result = await self._get_frontmatter({"content": content})
+            frontmatter = frontmatter_result["frontmatter"]
             
-            parts = content.split('---', 2)
-            if len(parts) < 3:
-                return {}
-                
-            frontmatter = parts[1].strip()
-            return json.loads(frontmatter)
-        except Exception as e:
-            raise Exception(f"Error parsing frontmatter: {str(e)}")
-            
-    def update_frontmatter(self, content: str, frontmatter: Dict[str, Any]) -> str:
-        """Update frontmatter in markdown content."""
-        try:
-            if not content.startswith('---'):
-                return f"---\n{json.dumps(frontmatter, indent=2)}\n---\n\n{content}"
-            
-            parts = content.split('---', 2)
-            if len(parts) < 3:
-                return f"---\n{json.dumps(frontmatter, indent=2)}\n---\n\n{content}"
-                
-            return f"---\n{json.dumps(frontmatter, indent=2)}\n---\n{parts[2]}"
-        except Exception as e:
-            raise Exception(f"Error updating frontmatter: {str(e)}")
-            
-    def validate_frontmatter(self, frontmatter: Dict[str, Any], schema: Dict[str, Any]) -> bool:
-        """Validate frontmatter against a schema."""
-        try:
-            # TODO: Implement schema validation
-            return True
-        except Exception as e:
-            raise Exception(f"Error validating frontmatter: {str(e)}")
-            
-    def remove_field(self, content: str, field: str) -> str:
-        """Remove a field from frontmatter."""
-        try:
-            frontmatter = self.get_frontmatter(content)
             if field in frontmatter:
                 del frontmatter[field]
-            return self.update_frontmatter(content, frontmatter)
+                update_result = await self._update_frontmatter({
+                    "content": content,
+                    "frontmatter": frontmatter
+                })
+                return {
+                    "content": update_result["content"],
+                    "removed_field": field,
+                    "timestamp": datetime.now().isoformat()
+                }
+            else:
+                return {
+                    "content": content,
+                    "message": f"Field {field} not found in frontmatter",
+                    "timestamp": datetime.now().isoformat()
+                }
         except Exception as e:
-            raise Exception(f"Error removing field from frontmatter: {str(e)}")
+            raise FrontmatterError(f"Error removing field from frontmatter: {str(e)}")
             
-    def search_by_field(self, field: str, value: Any) -> List[str]:
-        """Search notes by frontmatter field value."""
+    async def _search_by_field(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+        """Search notes by frontmatter field."""
+        search_field = parameters.get("search_field")
+        search_value = parameters.get("search_value")
+        
+        if not search_field or search_value is None:
+            raise ValueError("Search field and value are required for search operation")
+            
         try:
             matching_notes = []
-            for file_path in self._list_files(self.vault_path):
-                content = self._read_file(file_path)
-                frontmatter = self.get_frontmatter(content)
-                if field in frontmatter and frontmatter[field] == value:
-                    matching_notes.append(file_path)
-            return matching_notes
+            for file_path in Path(self.vault_path).rglob("*.md"):
+                content = file_path.read_text()
+                frontmatter_result = await self._get_frontmatter({"content": content})
+                frontmatter = frontmatter_result["frontmatter"]
+                
+                if search_field in frontmatter and frontmatter[search_field] == search_value:
+                    matching_notes.append(str(file_path.relative_to(self.vault_path)))
+                    
+            return {
+                "matches": matching_notes,
+                "count": len(matching_notes),
+                "search_field": search_field,
+                "search_value": search_value,
+                "timestamp": datetime.now().isoformat()
+            }
         except Exception as e:
-            raise Exception(f"Error searching by frontmatter field: {str(e)}")
-
-    def add_metadata(self, path: str, metadata: str) -> Dict[str, Any]:
-        """Add metadata to a note."""
+            raise FrontmatterError(f"Error searching by frontmatter field: {str(e)}")
+            
+    async def _add_metadata(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+        """Add metadata to note."""
+        path = parameters.get("path")
+        metadata = parameters.get("metadata")
+        
+        if not path or not metadata:
+            raise ValueError("Path and metadata are required for add_metadata operation")
+            
         try:
-            file_path = self._get_full_path(path)
-            content = self._read_file(file_path)
-            frontmatter = self.get_frontmatter(content)
+            file_path = Path(self.vault_path) / path
+            content = file_path.read_text()
             
-            if 'metadata' not in frontmatter:
-                frontmatter['metadata'] = []
+            frontmatter_result = await self._get_frontmatter({"content": content})
+            frontmatter = frontmatter_result["frontmatter"]
             
-            if metadata not in frontmatter['metadata']:
-                frontmatter['metadata'].append(metadata)
-            
-            updated_content = self.update_frontmatter(content, frontmatter)
-            self._write_file(file_path, updated_content)
-            return {"success": True, "message": f"Metadata '{metadata}' added to note '{path}' successfully"}
+            if "metadata" not in frontmatter:
+                frontmatter["metadata"] = []
+                
+            if metadata not in frontmatter["metadata"]:
+                frontmatter["metadata"].append(metadata)
+                update_result = await self._update_frontmatter({
+                    "content": content,
+                    "frontmatter": frontmatter
+                })
+                file_path.write_text(update_result["content"])
+                
+            return {
+                "message": f"Added metadata {metadata} to {path}",
+                "path": path,
+                "metadata": metadata,
+                "timestamp": datetime.now().isoformat()
+            }
         except Exception as e:
-            return {"error": str(e)}
-
-    def remove_metadata(self, path: str, metadata: str) -> Dict[str, Any]:
-        """Remove metadata from a note."""
+            raise FrontmatterError(f"Error adding metadata: {str(e)}")
+            
+    async def _remove_metadata(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+        """Remove metadata from note."""
+        path = parameters.get("path")
+        metadata = parameters.get("metadata")
+        
+        if not path or not metadata:
+            raise ValueError("Path and metadata are required for remove_metadata operation")
+            
         try:
-            file_path = self._get_full_path(path)
-            content = self._read_file(file_path)
-            frontmatter = self.get_frontmatter(content)
+            file_path = Path(self.vault_path) / path
+            content = file_path.read_text()
             
-            if 'metadata' in frontmatter and metadata in frontmatter['metadata']:
-                frontmatter['metadata'].remove(metadata)
-                updated_content = self.update_frontmatter(content, frontmatter)
-                self._write_file(file_path, updated_content)
-                return {"success": True, "message": f"Metadata '{metadata}' removed from note '{path}' successfully"}
-            else:
-                return {"error": f"Metadata '{metadata}' not found in note '{path}'"}
+            frontmatter_result = await self._get_frontmatter({"content": content})
+            frontmatter = frontmatter_result["frontmatter"]
+            
+            if "metadata" in frontmatter and metadata in frontmatter["metadata"]:
+                frontmatter["metadata"].remove(metadata)
+                update_result = await self._update_frontmatter({
+                    "content": content,
+                    "frontmatter": frontmatter
+                })
+                file_path.write_text(update_result["content"])
+                
+            return {
+                "message": f"Removed metadata {metadata} from {path}",
+                "path": path,
+                "metadata": metadata,
+                "timestamp": datetime.now().isoformat()
+            }
         except Exception as e:
-            return {"error": str(e)}
-
-    def list_metadata(self) -> List[str]:
-        """List all metadata in the vault."""
+            raise FrontmatterError(f"Error removing metadata: {str(e)}")
+            
+    async def _list_metadata(self) -> Dict[str, Any]:
+        """List all metadata in vault."""
         try:
             metadata_set = set()
-            for file_path in self._list_files(self.vault_path):
-                content = self._read_file(file_path)
-                frontmatter = self.get_frontmatter(content)
-                if 'metadata' in frontmatter:
-                    metadata_set.update(frontmatter['metadata'])
-            return list(metadata_set)
+            for file_path in Path(self.vault_path).rglob("*.md"):
+                content = file_path.read_text()
+                frontmatter_result = await self._get_frontmatter({"content": content})
+                frontmatter = frontmatter_result["frontmatter"]
+                
+                if "metadata" in frontmatter:
+                    metadata_set.update(frontmatter["metadata"])
+                    
+            return {
+                "metadata": list(metadata_set),
+                "count": len(metadata_set),
+                "timestamp": datetime.now().isoformat()
+            }
         except Exception as e:
-            return {"error": str(e)} 
+            raise FrontmatterError(f"Error listing metadata: {str(e)}") 

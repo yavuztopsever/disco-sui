@@ -1,3 +1,301 @@
+---
+description: This document describes the implementation of tools in DiscoSui. These will all work with smolagents agent.
+globs: 
+alwaysApply: false
+---
+# DiscoSui Tools Implementation Guide
+
+## Overview
+
+This document describes the implementation of tools in DiscoSui. These will all work with smolagents agent.
+
+## Tool Categories
+
+1. Core Tools
+   - `note_tools.py`: Basic note management (create, read, update, delete)
+   - `folder_tools.py`: Folder operations and structure management
+   - `tag_tools.py`: Tag management and organization
+   - `search_tools.py`: Search functionality across the vault
+
+2. Content Processing Tools
+   - `audio_tools.py`: Audio transcription and integration
+   - `email_tools.py`: Email processing and integration
+   - `content_tools.py`: Content manipulation and enhancement
+   - `markdown_tools.py`: Markdown formatting and processing
+
+3. Intelligence Tools
+   - `semantic_tools.py`: Semantic analysis and relationships
+   - `indexing_tools.py`: Vault indexing and RAG implementation
+   - `llm_tools.py`: LLM-based operations and processing
+   - `hierarchy_tools.py`: Knowledge hierarchy management
+
+4. Integration Tools
+   - `plugin_tools.py`: Obsidian plugin integration
+   - `api_tools.py`: External API integration
+   - `sync_tools.py`: Synchronization with external services
+   - `backup_tools.py`: Backup and version control
+
+## Implementation Details
+
+### Core Tools
+
+#### note_tools.py
+
+```python
+from pydantic import BaseModel
+from src.core.obsidian_utils import read_note, write_note, delete_note
+
+class CreateNoteInput(BaseModel):
+    note_name: str
+    content: str
+    template: str = None
+
+def create_note(input: CreateNoteInput) -> None:
+    """Creates a new note with optional template.
+
+    Args:
+        input: CreateNoteInput containing note_name, content, and optional template.
+
+    Raises:
+        FileExistsError: If note already exists
+        Exception: If any error occurs during creation
+    """
+    try:
+        if template:
+            # Apply template formatting
+            content = apply_template(input.template, input.content)
+        else:
+            content = input.content
+        write_note(input.note_name, content)
+    except Exception as e:
+        raise Exception(f"Error creating note: {e}")
+
+class UpdateNoteInput(BaseModel):
+    note_name: str
+    content: str
+    append: bool = False
+
+def update_note(input: UpdateNoteInput) -> None:
+    """Updates an existing note.
+
+    Args:
+        input: UpdateNoteInput containing note_name, content, and append flag.
+
+    Raises:
+        FileNotFoundError: If note doesn't exist
+        Exception: If any error occurs during update
+    """
+    try:
+        if input.append:
+            existing_content = read_note(input.note_name)
+            content = existing_content + "\n" + input.content
+        else:
+            content = input.content
+        write_note(input.note_name, content)
+    except Exception as e:
+        raise Exception(f"Error updating note: {e}")
+```
+
+#### folder_tools.py
+
+```python
+from pydantic import BaseModel
+from src.core.obsidian_utils import create_folder, move_folder, delete_folder
+
+class CreateFolderInput(BaseModel):
+    folder_path: str
+
+def create_folder(input: CreateFolderInput) -> None:
+    """Creates a new folder in the vault.
+
+    Args:
+        input: CreateFolderInput containing folder_path.
+
+    Raises:
+        Exception: If any error occurs during creation
+    """
+    try:
+        create_folder(input.folder_path)
+    except Exception as e:
+        raise Exception(f"Error creating folder: {e}")
+
+class MoveFolderInput(BaseModel):
+    source_path: str
+    destination_path: str
+
+def move_folder(input: MoveFolderInput) -> None:
+    """Moves a folder to a new location.
+
+    Args:
+        input: MoveFolderInput containing source and destination paths.
+
+    Raises:
+        FileNotFoundError: If source folder doesn't exist
+        Exception: If any error occurs during move
+    """
+    try:
+        move_folder(input.source_path, input.destination_path)
+    except Exception as e:
+        raise Exception(f"Error moving folder: {e}")
+```
+
+### Content Processing Tools
+
+#### markdown_tools.py
+
+```python
+from pydantic import BaseModel
+from src.core.obsidian_utils import process_markdown
+
+class FormatMarkdownInput(BaseModel):
+    content: str
+    style: str = "default"
+
+def format_markdown(input: FormatMarkdownInput) -> str:
+    """Formats markdown content according to specified style.
+
+    Args:
+        input: FormatMarkdownInput containing content and style.
+
+    Returns:
+        str: Formatted markdown content
+
+    Raises:
+        ValueError: If style is invalid
+        Exception: If any error occurs during formatting
+    """
+    try:
+        return process_markdown(input.content, input.style)
+    except Exception as e:
+        raise Exception(f"Error formatting markdown: {e}")
+```
+
+### Intelligence Tools
+
+#### semantic_tools.py
+
+```python
+from pydantic import BaseModel
+from src.core.obsidian_utils import analyze_semantics, find_relationships
+
+class AnalyzeContentInput(BaseModel):
+    content: str
+    analysis_type: str = "basic"
+
+def analyze_content(input: AnalyzeContentInput) -> dict:
+    """Performs semantic analysis on content.
+
+    Args:
+        input: AnalyzeContentInput containing content and analysis type.
+
+    Returns:
+        dict: Analysis results
+
+    Raises:
+        ValueError: If analysis type is invalid
+        Exception: If any error occurs during analysis
+    """
+    try:
+        return analyze_semantics(input.content, input.analysis_type)
+    except Exception as e:
+        raise Exception(f"Error analyzing content: {e}")
+```
+
+## Usage Guidelines
+
+1. Error Handling
+   - All tools should implement proper error handling
+   - Use specific exception types for different error cases
+   - Provide clear error messages with context
+
+2. Input Validation
+   - Use Pydantic models for input validation
+   - Implement strict type checking
+   - Provide clear parameter descriptions
+
+3. Documentation
+   - Include detailed docstrings for all functions
+   - Document all parameters and return values
+   - Provide usage examples
+
+4. Testing
+   - Write unit tests for all tools
+   - Include edge cases in tests
+   - Maintain high test coverage
+
+## Best Practices
+
+1. Tool Design
+   - Keep tools focused and single-purpose
+   - Follow SOLID principles
+   - Maintain consistency across tools
+
+2. Performance
+   - Implement caching where appropriate
+   - Optimize for large vaults
+   - Consider async operations for I/O-heavy tasks
+
+3. Security
+   - Validate all inputs
+   - Sanitize file paths
+   - Handle sensitive data appropriately
+
+4. Maintainability
+   - Follow consistent coding style
+   - Keep functions small and focused
+   - Use meaningful variable names
+
+## Integration Guidelines
+
+1. Plugin Integration
+   - Follow Obsidian plugin guidelines
+   - Maintain compatibility with Obsidian API
+   - Handle plugin lifecycle events
+
+2. External Services
+   - Implement proper authentication
+   - Handle rate limiting
+   - Manage API keys securely
+
+3. Data Synchronization
+   - Implement conflict resolution
+   - Handle offline operations
+   - Maintain data integrity
+
+## Deployment
+
+1. Environment Setup
+   - Use virtual environments
+   - Manage dependencies with requirements.txt
+   - Document environment variables
+
+2. Testing
+   - Run unit tests before deployment
+   - Perform integration testing
+   - Validate in staging environment
+
+3. Monitoring
+   - Implement logging
+   - Track performance metrics
+   - Monitor error rates
+
+## Contributing
+
+1. Code Standards
+   - Follow PEP 8 guidelines
+   - Use type hints
+   - Write clear commit messages
+
+2. Documentation
+   - Update docs with changes
+   - Include example usage
+   - Document breaking changes
+
+3. Testing
+   - Add tests for new features
+   - Update existing tests
+   - Maintain test coverage
+
 Custom tools:
 
 audio_tools.py: Handles audio transcription and linking, which are core features for integrating audio content.
@@ -530,6 +828,8 @@ def find_related_notes(input: FindRelatedNotesInput) -> list:
     """
     try:
         return find_vault_related_notes(input.note_name)
+    except Exception as e:
+        raise Exception(f"Error finding related notes: {e}")
 
 
 
