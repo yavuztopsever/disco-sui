@@ -1,0 +1,49 @@
+{
+  "app": {
+    "name": "DiscoSui",
+    "version": "1.0.0",
+    "environment": "development"
+  },
+  "server": {
+    "host": "localhost",
+    "port": 8000,
+    "debug": true
+  },
+  "database": {
+    "type": "vector",
+    "provider": "chromadb",
+    "path": "./data/vectordb"
+  },
+  "obsidian": {
+    "vault_path": "",
+    "templates_path": "templates",
+    "attachments_path": "attachments"
+  },
+  "services": {
+    "email": {
+      "enabled": true,
+      "check_interval_minutes": 15,
+      "processing_path": "email_processing"
+    },
+    "audio": {
+      "enabled": true,
+      "check_interval_minutes": 30,
+      "transcription_model": "base",
+      "processing_path": "audio_processing"
+    }
+  },
+  "llm": {
+    "provider": "openai",
+    "model": "gpt-4",
+    "temperature": 0.7,
+    "max_tokens": 2000
+  },
+  "security": {
+    "api_key_required": true,
+    "cors_origins": ["http://localhost:3000"]
+  },
+  "logging": {
+    "level": "INFO",
+    "file": "logs/app.log"
+  }
+}

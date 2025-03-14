@@ -1,0 +1,13 @@
+{
+  "id": "discosui",
+  "name": "DiscoSui",
+  "version": "1.0.0",
+  "minAppVersion": "0.15.0",
+  "description": "An AI-powered chat interface for managing and interacting with your Obsidian vault",
+  "author": "DiscoSui Team",
+  "authorUrl": "https://github.com/yourusername/discosui",
+  "isDesktopOnly": false,
+  "fundingUrl": {
+    "Buy Me a Coffee": "https://buymeacoffee.com/yourusername"
+  }
+} 
