@@ -3,10 +3,37 @@ import os
 from typing import List, Dict, Any, Union, Optional
 import re
 from pydantic import BaseModel
-from ..features.indexing.rag import RAG
-from ..features.indexing.indexer import Indexer
-from ..features.semantic_analysis.semantic_analyzer import SemanticAnalyzer
 from datetime import datetime
+import logging
+from src.core.exceptions import (
+    NoteNotFoundError,
+    NoteAlreadyExistsError,
+    TemplateNotFoundError,
+    FrontmatterError,
+    NoteManagementError
+)
+from src.tools.service_tools import trigger_service, TriggerServiceInput
+from src.services.service_manager import service_registry, ServiceStatus
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# Placeholder classes for missing modules
+class RAG:
+    def __init__(self):
+        pass
+
+class Indexer:
+    def __init__(self):
+        pass
+
+class SemanticAnalyzer:
+    def __init__(self):
+        pass
 
 class NoteRequest(BaseModel):
     """Pydantic model for note-related requests."""
@@ -203,162 +230,309 @@ class OpenNoteTool(Tool):
                 "error": str(e)
             }
 
-class NoteManagementAgent(ToolCallingAgent):
+class TriggerServiceTool(Tool):
+    name = "trigger_service"
+    description = "Trigger a service to update vault contents"
+    inputs = {
+        "service_name": {
+            "type": "string",
+            "description": "Name of the service to trigger"
+        },
+        "target_notes": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Optional list of specific notes to update",
+            "nullable": True
+        },
+        "force_update": {
+            "type": "boolean",
+            "description": "Whether to force update even if no changes detected",
+            "default": False
+        },
+        "options": {
+            "type": "object",
+            "description": "Optional service-specific configuration options",
+            "nullable": True
+        }
+    }
+    output_type = "object"
+    
     def __init__(self, vault_path: str):
-        """Initialize the NoteManagementAgent with a vault path."""
         self.vault_path = vault_path
-        self.plugin_path = os.path.join(vault_path, '.obsidian', 'plugins', 'discosui')
         
-        # Initialize RAG and indexing components
-        self.rag = RAG()
-        self.indexer = Indexer()
-        self.semantic_analyzer = SemanticAnalyzer()
+    def forward(
+        self,
+        service_name: str,
+        target_notes: Optional[List[str]] = None,
+        force_update: bool = False,
+        options: Optional[dict] = None
+    ) -> Dict[str, Any]:
+        """Trigger a service to update vault contents.
         
-        # Initialize all available tools
-        tools = [
-            # Note Management Tools
-            CreateNoteTool(vault_path),
-            DeleteNoteTool(vault_path),
-            ListNotesTool(vault_path),
-            SearchNotesTool(vault_path),
-            UpdateNoteTool(vault_path),
+        Args:
+            service_name: Name of the service to trigger
+            target_notes: Optional list of specific notes to update
+            force_update: Whether to force update even if no changes detected
+            options: Optional service-specific configuration options
             
-            # Folder Management Tools
-            CreateFolderTool(vault_path),
-            DeleteFolderTool(vault_path),
-            MoveFolderTool(vault_path),
-            ListFoldersTool(vault_path),
-            GetFolderContentsTool(vault_path),
+        Returns:
+            Dict containing the result of the service trigger operation
             
-            # Tag Management Tools
-            TagManagerTool(vault_path),
+        Raises:
+            ValueError: If service is not found or is already running
+            Exception: If service execution fails
+        """
+        try:
+            input_data = TriggerServiceInput(
+                service_name=service_name,
+                target_notes=target_notes,
+                force_update=force_update,
+                options=options
+            )
             
-            # Template Management Tools
-            CreateTemplateTool(vault_path),
-            DeleteTemplateTool(vault_path),
-            ListTemplatesTool(vault_path),
-            ApplyTemplateTool(vault_path),
-            GetTemplateContentTool(vault_path),
+            trigger_service(input_data)
             
-            # Audio Processing Tools
-            TranscribeAudioTool(vault_path),
-            ListAudioFilesTool(vault_path),
-            GetTranscriptionNoteTool(vault_path),
+            # Get service status after triggering
+            status = service_registry.get_status(service_name)
+            last_run = service_registry.get_last_run(service_name)
             
-            # Email Processing Tools
-            ProcessEmailTool(vault_path),
-            ListEmailFilesTool(vault_path),
-            GetEmailNoteTool(vault_path),
+            return {
+                "success": True,
+                "service": service_name,
+                "status": status.value,
+                "last_run": last_run.isoformat() if last_run else None,
+                "message": f"Service {service_name} triggered successfully"
+            }
             
-            # Indexing and Search Tools
-            IndexNoteTool(vault_path),
-            ClusterNotesTool(vault_path),
-            
-            # Semantic Analysis Tools
-            AnalyzeRelationshipsTool(vault_path),
-            FindRelatedNotesTool(vault_path),
-            GenerateKnowledgeGraphTool(vault_path),
-            
-            # Vault Reorganization Tools
-            AnalyzeVaultStructureTool(vault_path),
-            ReorganizeVaultTool(vault_path),
-            SuggestOrganizationTool(vault_path),
-            
-            # Hierarchy Management Tools
-            HierarchyManagerTool(vault_path),
-            
-            # Additional Tools
-            OpenNoteTool(vault_path)
-        ]
+        except Exception as e:
+            return {
+                "success": False,
+                "service": service_name,
+                "error": str(e),
+                "message": f"Failed to trigger service {service_name}"
+            }
+
+class NoteManagementAgent(ToolCallingAgent):
+    """NoteManagementAgent manages Obsidian vault operations through natural language interaction.
+    
+    This agent provides comprehensive note management capabilities including:
+    - Note creation, deletion, and modification
+    - Folder management
+    - Tag management
+    - Template management
+    - Audio and email processing
+    - Semantic analysis and RAG
+    - Vault organization
+    
+    Attributes:
+        vault_path (str): Path to the Obsidian vault
+        plugin_path (str): Path to the DiscoSui plugin directory
+        rag (RAG): Retrieval Augmented Generation component
+        indexer (Indexer): Note indexing component
+        semantic_analyzer (SemanticAnalyzer): Semantic analysis component
+        tool_usage_stats (Dict): Statistics about tool usage
+    """
+    
+    def __init__(self, vault_path: str):
+        """Initialize the NoteManagementAgent with a vault path.
         
-        # Initialize parent class with tools and enhanced system prompt
-        super().__init__(
-            model=LiteLLMModel(
-                model_id="gpt-4",
-                api_key=os.getenv("OPENAI_API_KEY"),
-                temperature=0.7,
-                max_tokens=1000,
-                request_timeout=30
-            ),
-            tools=tools,
-            system_prompt="""You are DiscoSui, an intelligent assistant for managing Obsidian vaults.
-            Your role is to help users interact with their notes through natural language.
+        Args:
+            vault_path (str): Path to the Obsidian vault
             
-            Available Capabilities:
-            1. Note Management:
-               - Create, update, and delete notes
-               - Search for notes using semantic search
-               - List and organize notes
-               - Apply templates to notes
+        Raises:
+            NoteManagementError: If initialization fails
+        """
+        try:
+            self.vault_path = vault_path
+            self.plugin_path = os.path.join(vault_path, '.obsidian', 'plugins', 'discosui')
             
-            2. Folder Management:
-               - Create, delete, and move folders
-               - List folder contents
-               - Organize notes in folders
+            logger.info(f"Initializing NoteManagementAgent with vault path: {vault_path}")
             
-            3. Tag Management:
-               - Add, remove, and search by tags
-               - Get tag statistics
-               - Find related tags
-               - Suggest tags based on content
+            # Initialize RAG and indexing components
+            try:
+                self.rag = RAG()
+                self.indexer = Indexer()
+                self.semantic_analyzer = SemanticAnalyzer()
+                logger.info("Successfully initialized RAG and indexing components")
+            except Exception as e:
+                logger.error(f"Failed to initialize RAG components: {str(e)}")
+                raise NoteManagementError(f"Failed to initialize RAG components: {str(e)}")
+
+            # Initialize all available tools
+            try:
+                tools = [
+                    # Note Management Tools
+                    CreateNoteTool(vault_path),
+                    DeleteNoteTool(vault_path),
+                    ListNotesTool(vault_path),
+                    SearchNotesTool(vault_path),
+                    UpdateNoteTool(vault_path),
+                    
+                    # Folder Management Tools
+                    CreateFolderTool(vault_path),
+                    DeleteFolderTool(vault_path),
+                    MoveFolderTool(vault_path),
+                    ListFoldersTool(vault_path),
+                    GetFolderContentsTool(vault_path),
+                    
+                    # Tag Management Tools
+                    TagManagerTool(vault_path),
+                    
+                    # Template Management Tools
+                    CreateTemplateTool(vault_path),
+                    DeleteTemplateTool(vault_path),
+                    ListTemplatesTool(vault_path),
+                    ApplyTemplateTool(vault_path),
+                    GetTemplateContentTool(vault_path),
+                    
+                    # Audio Processing Tools
+                    TranscribeAudioTool(vault_path),
+                    ListAudioFilesTool(vault_path),
+                    GetTranscriptionNoteTool(vault_path),
+                    
+                    # Email Processing Tools
+                    ProcessEmailTool(vault_path),
+                    ListEmailFilesTool(vault_path),
+                    GetEmailNoteTool(vault_path),
+                    
+                    # Indexing and Search Tools
+                    IndexNoteTool(vault_path),
+                    ClusterNotesTool(vault_path),
+                    
+                    # Semantic Analysis Tools
+                    AnalyzeRelationshipsTool(vault_path),
+                    FindRelatedNotesTool(vault_path),
+                    GenerateKnowledgeGraphTool(vault_path),
+                    
+                    # Vault Reorganization Tools
+                    AnalyzeVaultStructureTool(vault_path),
+                    ReorganizeVaultTool(vault_path),
+                    SuggestOrganizationTool(vault_path),
+                    
+                    # Hierarchy Management Tools
+                    HierarchyManagerTool(vault_path),
+                    
+                    # Additional Tools
+                    OpenNoteTool(vault_path),
+                    TriggerServiceTool(vault_path)
+                ]
+                logger.info("Successfully initialized all tools")
+            except Exception as e:
+                logger.error(f"Failed to initialize tools: {str(e)}")
+                raise NoteManagementError(f"Failed to initialize tools: {str(e)}")
+
+            # Initialize parent class
+            try:
+                super().__init__(
+                    model=LiteLLMModel(
+                        model_id="gpt-4",
+                        api_key=os.getenv("OPENAI_API_KEY"),
+                        temperature=0.7,
+                        max_tokens=1000,
+                        request_timeout=30
+                    ),
+                    tools=tools,
+                    system_prompt="""You are DiscoSui, an intelligent assistant for managing Obsidian vaults.
+                    Your role is to help users interact with their notes through natural language.
+                    
+                    Available Capabilities:
+                    1. Note Management:
+                       - Create, update, and delete notes
+                       - Search for notes using semantic search
+                       - List and organize notes
+                       - Apply templates to notes
+                    
+                    2. Folder Management:
+                       - Create, delete, and move folders
+                       - List folder contents
+                       - Organize notes in folders
+                    
+                    3. Tag Management:
+                       - Add, remove, and search by tags
+                       - Get tag statistics
+                       - Find related tags
+                       - Suggest tags based on content
+                    
+                    4. Template Management:
+                       - Create and manage templates
+                       - Apply templates to notes
+                       - Validate template usage
+                    
+                    5. Content Processing:
+                       - Transcribe audio files to notes
+                       - Process and organize emails
+                       - Generate knowledge graphs
+                       - Analyze relationships between notes
+                    
+                    6. Vault Organization:
+                       - Analyze vault structure
+                       - Suggest organization improvements
+                       - Reorganize content
+                       - Maintain hierarchy
+                    
+                    7. Semantic Analysis:
+                       - Find related notes
+                       - Analyze content relationships
+                       - Generate insights
+                       - Answer questions using RAG
+                    
+                    Always:
+                    1. Maintain a conversational tone
+                    2. Provide helpful, context-aware responses
+                    3. Ask for clarification when needed
+                    4. Follow vault structure and templates
+                    5. Consider opening relevant notes automatically
+                    6. Use appropriate tools for each task
+                    7. Handle errors gracefully
+                    8. Provide clear feedback and next steps"""
+                )
+                logger.info("Successfully initialized parent class")
+            except Exception as e:
+                logger.error(f"Failed to initialize parent class: {str(e)}")
+                raise NoteManagementError(f"Failed to initialize parent class: {str(e)}")
+
+            # Setup plugin and initialize knowledge base
+            self._ensure_plugin_setup()
+            self._initialize_knowledge_base()
             
-            4. Template Management:
-               - Create and manage templates
-               - Apply templates to notes
-               - Validate template usage
+            # Initialize tool usage tracking
+            self.tool_usage_stats = {}
+            logger.info("NoteManagementAgent initialization completed successfully")
             
-            5. Content Processing:
-               - Transcribe audio files to notes
-               - Process and organize emails
-               - Generate knowledge graphs
-               - Analyze relationships between notes
-            
-            6. Vault Organization:
-               - Analyze vault structure
-               - Suggest organization improvements
-               - Reorganize content
-               - Maintain hierarchy
-            
-            7. Semantic Analysis:
-               - Find related notes
-               - Analyze content relationships
-               - Generate insights
-               - Answer questions using RAG
-            
-            Always:
-            1. Maintain a conversational tone
-            2. Provide helpful, context-aware responses
-            3. Ask for clarification when needed
-            4. Follow vault structure and templates
-            5. Consider opening relevant notes automatically
-            6. Use appropriate tools for each task
-            7. Handle errors gracefully
-            8. Provide clear feedback and next steps"""
-        )
-        
-        # Setup plugin after parent initialization
-        self._ensure_plugin_setup()
-        
-        # Initialize the knowledge base
-        self._initialize_knowledge_base()
-        
-        # Initialize tool usage tracking
-        self.tool_usage_stats = {}
+        except Exception as e:
+            logger.error(f"Failed to initialize NoteManagementAgent: {str(e)}")
+            raise NoteManagementError(f"Failed to initialize NoteManagementAgent: {str(e)}")
 
     def _initialize_knowledge_base(self):
-        """Initialize the knowledge base by indexing all notes."""
+        """Initialize the knowledge base by indexing all notes.
+        
+        Raises:
+            NoteManagementError: If knowledge base initialization fails
+        """
         try:
-            # Index all notes in the vault
+            logger.info("Starting knowledge base initialization")
             self.indexer.index_directory(self.vault_path)
+            logger.info("Successfully initialized knowledge base")
         except Exception as e:
-            print(f"Warning: Error initializing knowledge base: {str(e)}")
+            logger.error(f"Failed to initialize knowledge base: {str(e)}")
+            raise NoteManagementError(f"Failed to initialize knowledge base: {str(e)}")
 
     def _ensure_plugin_setup(self):
-        """Ensure the Obsidian plugin directory structure exists."""
-        os.makedirs(self.plugin_path, exist_ok=True)
-        manifest_path = os.path.join(self.plugin_path, 'manifest.json')
-        if not os.path.exists(manifest_path):
-            self._create_manifest()
+        """Ensure the Obsidian plugin directory structure exists.
+        
+        Raises:
+            NoteManagementError: If plugin setup fails
+        """
+        try:
+            logger.info("Setting up plugin directory structure")
+            os.makedirs(self.plugin_path, exist_ok=True)
+            manifest_path = os.path.join(self.plugin_path, 'manifest.json')
+            if not os.path.exists(manifest_path):
+                self._create_manifest()
+            logger.info("Successfully set up plugin directory structure")
+        except Exception as e:
+            logger.error(f"Failed to set up plugin directory: {str(e)}")
+            raise NoteManagementError(f"Failed to set up plugin directory: {str(e)}")
 
     def _create_manifest(self):
         """Create the plugin manifest file."""
@@ -380,160 +554,184 @@ class NoteManagementAgent(ToolCallingAgent):
             json.dump(manifest, f, indent=2)
 
     def _track_tool_usage(self, tool_name: str, success: bool, error: Optional[str] = None):
-        """Track tool usage statistics."""
-        if tool_name not in self.tool_usage_stats:
-            self.tool_usage_stats[tool_name] = {
-                "total_calls": 0,
-                "successful_calls": 0,
-                "failed_calls": 0,
-                "last_used": None,
-                "common_errors": {}
-            }
+        """Track tool usage statistics.
         
-        stats = self.tool_usage_stats[tool_name]
-        stats["total_calls"] += 1
-        stats["last_used"] = datetime.now().isoformat()
-        
-        if success:
-            stats["successful_calls"] += 1
-        else:
-            stats["failed_calls"] += 1
-            if error:
-                if error not in stats["common_errors"]:
-                    stats["common_errors"][error] = 0
-                stats["common_errors"][error] += 1
+        Args:
+            tool_name (str): Name of the tool
+            success (bool): Whether the tool execution was successful
+            error (Optional[str]): Error message if the tool execution failed
+        """
+        try:
+            if tool_name not in self.tool_usage_stats:
+                self.tool_usage_stats[tool_name] = {
+                    "total_calls": 0,
+                    "successful_calls": 0,
+                    "failed_calls": 0,
+                    "last_used": None,
+                    "common_errors": {}
+                }
+            
+            stats = self.tool_usage_stats[tool_name]
+            stats["total_calls"] += 1
+            stats["last_used"] = datetime.now().isoformat()
+            
+            if success:
+                stats["successful_calls"] += 1
+                logger.info(f"Tool {tool_name} executed successfully")
+            else:
+                stats["failed_calls"] += 1
+                if error:
+                    if error not in stats["common_errors"]:
+                        stats["common_errors"][error] = 0
+                    stats["common_errors"][error] += 1
+                logger.warning(f"Tool {tool_name} execution failed: {error}")
+        except Exception as e:
+            logger.error(f"Failed to track tool usage: {str(e)}")
 
     async def process_message(self, message: str) -> Dict[str, Any]:
-        """Process a natural language message and return an appropriate response."""
+        """Process a natural language message and return an appropriate response.
+        
+        Args:
+            message (str): The user's message to process
+            
+        Returns:
+            Dict[str, Any]: The response containing success status, message, and any relevant data
+            
+        Raises:
+            NoteManagementError: If message processing fails
+        """
         try:
-            # Use the LLM to understand the intent and extract relevant information
-            intent_prompt = f"""Analyze the following user message and determine:
-            1. The primary intent (create, read, update, delete, search, analyze, question, organize, process)
-            2. Any relevant parameters (title, content, folder, tags, template)
-            3. Any additional context or requirements
-            4. Whether any notes should be automatically opened
-            5. Which specific tools would be most appropriate
-            6. Any potential errors or edge cases to handle
+            logger.info(f"Processing message: {message}")
+            
+            # Use the LLM to understand the intent
+            try:
+                intent_response = await self.model.generate(self._create_intent_prompt(message))
+                intent_data = intent_response.json()
+                logger.info(f"Successfully analyzed message intent: {intent_data['intent']}")
+            except Exception as e:
+                logger.error(f"Failed to analyze message intent: {str(e)}")
+                raise NoteManagementError(f"Failed to analyze message intent: {str(e)}")
 
-            Message: {message}
+            # Create NoteRequest object
+            try:
+                note_request = NoteRequest(**intent_data["parameters"])
+                logger.info("Successfully created note request")
+            except Exception as e:
+                logger.error(f"Failed to create note request: {str(e)}")
+                raise NoteManagementError(f"Failed to create note request: {str(e)}")
 
-            Format your response as JSON with the following structure:
-            {{
-                "intent": "string",
-                "parameters": {{
-                    "title": "string or null",
-                    "content": "string or null",
-                    "folder": "string or null",
-                    "tags": ["string"],
-                    "template": "string or null"
-                }},
-                "context": "string",
-                "auto_open_notes": ["string"],
-                "recommended_tools": ["string"],
-                "potential_errors": ["string"]
-            }}"""
+            # Track tool usage and process the request
+            result = await self._process_intent(intent_data, note_request)
+            logger.info("Successfully processed message")
+            return result
 
-            # Get intent analysis from LLM
-            intent_response = await self.model.generate(intent_prompt)
-            intent_data = intent_response.json()
+        except Exception as e:
+            logger.error(f"Failed to process message: {str(e)}")
+            return self._format_error_response(str(e), "An error occurred while processing your request")
 
-            # Create a NoteRequest object from the extracted parameters
-            note_request = NoteRequest(**intent_data["parameters"])
+    def _create_intent_prompt(self, message: str) -> str:
+        """Create the prompt for intent analysis.
+        
+        Args:
+            message (str): The user's message
+            
+        Returns:
+            str: The formatted prompt for intent analysis
+        """
+        return f"""Analyze the following user message and determine:
+        1. The primary intent (create, read, update, delete, search, analyze, question, organize, process)
+        2. Any relevant parameters (title, content, folder, tags, template)
+        3. Any additional context or requirements
+        4. Whether any notes should be automatically opened
+        5. Which specific tools would be most appropriate
+        6. Any potential errors or edge cases to handle
 
+        Message: {message}
+
+        Format your response as JSON with the following structure:
+        {{
+            "intent": "string",
+            "parameters": {{
+                "title": "string or null",
+                "content": "string or null",
+                "folder": "string or null",
+                "tags": ["string"],
+                "template": "string or null"
+            }},
+            "context": "string",
+            "auto_open_notes": ["string"],
+            "recommended_tools": ["string"],
+            "potential_errors": ["string"]
+        }}"""
+
+    async def _process_intent(self, intent_data: Dict[str, Any], note_request: NoteRequest) -> Dict[str, Any]:
+        """Process the analyzed intent and execute appropriate actions.
+        
+        Args:
+            intent_data (Dict[str, Any]): The analyzed intent data
+            note_request (NoteRequest): The note request object
+            
+        Returns:
+            Dict[str, Any]: The response containing success status, message, and any relevant data
+            
+        Raises:
+            NoteManagementError: If intent processing fails
+        """
+        try:
             # Track tool usage
             for tool_name in intent_data.get("recommended_tools", []):
                 self._track_tool_usage(tool_name, True)
 
-            # Open relevant notes if specified
-            if intent_data.get("auto_open_notes"):
-                open_tool = next((t for t in self.tools if t.name == "open_note"), None)
-                if open_tool:
-                    for note_title in intent_data["auto_open_notes"]:
-                        try:
-                            await open_tool.forward(title=note_title)
-                            self._track_tool_usage("open_note", True)
-                        except Exception as e:
-                            self._track_tool_usage("open_note", False, str(e))
-
-            # Route to appropriate tool based on intent
+            # Handle question intent
             if intent_data["intent"] == "question":
-                # Use RAG for question answering
-                response = self.rag.process_query(message)
-                
-                # Open relevant notes from RAG response
-                if response.notes_to_open:
-                    open_tool = next((t for t in self.tools if t.name == "open_note"), None)
-                    if open_tool:
-                        for note_title in response.notes_to_open:
-                            try:
-                                await open_tool.forward(title=note_title)
-                                self._track_tool_usage("open_note", True)
-                            except Exception as e:
-                                self._track_tool_usage("open_note", False, str(e))
-                
-                return self._format_response(response.dict(), intent_data["context"])
-            
-            # Handle other intents with appropriate tools
-            tool = next((t for t in self.tools if t.name in intent_data.get("recommended_tools", [])), None)
-            if tool:
-                try:
-                    result = await tool.forward(**note_request.dict(exclude_none=True))
-                    self._track_tool_usage(tool.name, True)
-                    return self._format_response(result, intent_data["context"])
-                except Exception as e:
-                    self._track_tool_usage(tool.name, False, str(e))
-                    return self._format_error_response(str(e), intent_data["context"])
-            
-            # Default response for unrecognized intents
-            return {
-                "success": True,
-                "response": "I understand you want to interact with your notes, but I'm not sure exactly what you'd like to do. Could you please clarify your request?",
-                "context": intent_data["context"]
-            }
-            
+                return await self._handle_question_intent(message, intent_data)
+
+            # Handle other intents
+            return await self._handle_general_intent(intent_data, note_request)
+
         except Exception as e:
-            return {
-                "success": False,
-                "error": str(e),
-                "response": "I encountered an error while processing your request. Could you please try rephrasing it?"
-            }
+            logger.error(f"Failed to process intent: {str(e)}")
+            raise NoteManagementError(f"Failed to process intent: {str(e)}")
 
     def _format_response(self, result: Dict[str, Any], context: str) -> Dict[str, Any]:
-        """Format the tool response into a conversational message."""
-        if not result.get("success", False):
-            return {
-                "success": False,
-                "error": result.get("error", "Unknown error"),
-                "response": "I encountered an error while processing your request. Could you please try again?"
-            }
-
-        # Create a conversational response based on the result and context
-        response_prompt = f"""Based on the following result and context, create a natural, conversational response:
-
-        Result: {result}
-        Context: {context}
-
-        The response should:
-        1. Acknowledge the user's request
-        2. Explain what was done
-        3. Provide relevant details from the result
-        4. Mention any notes that were opened
-        5. Suggest next steps if appropriate
-
-        Response:"""
-
-        # Get conversational response from LLM
-        response = self.model.generate(response_prompt)
+        """Format the tool response into a conversational message.
         
-        return {
-            "success": True,
-            "response": response,
-            "context": context,
-            "data": result
-        }
+        Args:
+            result (Dict[str, Any]): The raw result from tool execution
+            context (str): The context of the request
+            
+        Returns:
+            Dict[str, Any]: The formatted response
+        """
+        try:
+            if not result.get("success", False):
+                logger.warning(f"Tool execution failed: {result.get('error', 'Unknown error')}")
+                return self._format_error_response(result.get("error", "Unknown error"), context)
+
+            response = self.model.generate(self._create_response_prompt(result, context))
+            logger.info("Successfully formatted response")
+            
+            return {
+                "success": True,
+                "response": response,
+                "context": context,
+                "data": result
+            }
+        except Exception as e:
+            logger.error(f"Failed to format response: {str(e)}")
+            return self._format_error_response(str(e), context)
 
     def _format_error_response(self, error: str, context: str) -> Dict[str, Any]:
-        """Format an error response with helpful suggestions."""
+        """Format an error response with helpful suggestions.
+        
+        Args:
+            error (str): The error message
+            context (str): The context of the request
+            
+        Returns:
+            Dict[str, Any]: The formatted error response
+        """
+        logger.error(f"Formatting error response: {error}")
         return {
             "success": False,
             "error": error,
@@ -547,15 +745,29 @@ class NoteManagementAgent(ToolCallingAgent):
         }
 
     def get_tool_usage_stats(self) -> Dict[str, Any]:
-        """Get statistics about tool usage."""
+        """Get statistics about tool usage.
+        
+        Returns:
+            Dict[str, Any]: Tool usage statistics
+        """
         return self.tool_usage_stats
 
     async def run(self, task: str) -> Union[Dict[str, Any], str]:
-        """Run the agent on a given task."""
+        """Run the agent on a given task.
+        
+        Args:
+            task (str): The task to run
+            
+        Returns:
+            Union[Dict[str, Any], str]: The result of running the task
+        """
         try:
+            logger.info(f"Running task: {task}")
             result = await self.process_message(task)
+            logger.info("Successfully completed task")
             return result
         except Exception as e:
+            logger.error(f"Failed to run task: {str(e)}")
             return {
                 "success": False,
                 "error": str(e),

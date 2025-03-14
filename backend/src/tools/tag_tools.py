@@ -1,9 +1,12 @@
 from typing import Dict, Any, Optional, List
 from .base_tools import BaseTool, FrontmatterManagerTool
-from ..features.tag_management.tag_manager import TagManager
-from ..features.tag_management.tag_validator import TagValidator
+from ..services.organization.tags import TagManager, TagValidator
 import re
+import asyncio
 from smolagents import Tool
+from pathlib import Path
+
+from ..core.tool_interfaces import TagTool
 
 class TagManagerTool(BaseTool):
     name = "tag_manager"
@@ -44,6 +47,18 @@ class TagManagerTool(BaseTool):
         self.frontmatter_manager = FrontmatterManagerTool()
         self.tag_validator = TagValidator()
         self.tag_manager = TagManager(vault_path)
+        # Start the services
+        asyncio.create_task(self._start_services())
+
+    async def _start_services(self) -> None:
+        """Start the tag management services."""
+        await self.tag_validator.start()
+        await self.tag_manager.start()
+
+    async def _stop_services(self) -> None:
+        """Stop the tag management services."""
+        await self.tag_validator.stop()
+        await self.tag_manager.stop()
 
     def forward(self, action: str, **kwargs) -> Dict[str, Any]:
         try:
@@ -194,4 +209,67 @@ class TagManagerTool(BaseTool):
             stats = self.tag_manager.get_tag_stats()
             return {"success": True, "stats": stats}
         except Exception as e:
-            return {"error": str(e)} 
+            return {"error": str(e)}
+
+    def __del__(self):
+        """Cleanup when the tool is destroyed."""
+        asyncio.create_task(self._stop_services())
+
+class ExtractTagsTool(TagTool):
+    """Tool for extracting tags from content."""
+    
+    async def forward(
+        self,
+        content: str,
+        include_hierarchy: bool = True
+    ) -> List[str]:
+        """Extract tags from content.
+        
+        Args:
+            content: Content to extract tags from
+            include_hierarchy: Whether to include hierarchical tags
+            
+        Returns:
+            List of extracted tags
+        """
+        return await self.extract_tags(content, include_hierarchy)
+
+class UpdateTagsTool(TagTool):
+    """Tool for updating tags in content."""
+    
+    async def forward(
+        self,
+        path: Path,
+        tags: List[str],
+        operation: str = "add"
+    ) -> Dict[str, Any]:
+        """Update tags in a file.
+        
+        Args:
+            path: Path to the file
+            tags: Tags to update
+            operation: Operation to perform ("add", "remove", "set")
+            
+        Returns:
+            Update results
+        """
+        return await self.update_tags(path, tags, operation)
+
+class TagHierarchyTool(TagTool):
+    """Tool for managing tag hierarchies."""
+    
+    async def forward(
+        self,
+        content: str,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Analyze tag hierarchy.
+        
+        Args:
+            content: Content to analyze
+            **kwargs: Additional analysis parameters
+            
+        Returns:
+            Analysis results
+        """
+        return await self.analyze_content(content, analysis_type="tags", **kwargs) 

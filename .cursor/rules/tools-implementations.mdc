@@ -70,7 +70,7 @@ def link_audio_to_note(input: LinkAudioInput) -> None:
     """
     try:
         note_content = read_note(input.note_name)
-        link_markdown = f"\n[Audio]({input.audio_path})\n"
+        link_markdown = f"\n[Audio](mdc:{input.audio_path})\n"
         updated_content = note_content + link_markdown
         write_note(input.note_name, updated_content)
     except FileNotFoundError:
@@ -199,7 +199,7 @@ def link_email_to_note(input: LinkEmailInput) -> None:
     """
     try:
         note_content = read_note(input.note_name)
-        link_markdown = f"\n[Email]({input.email_path})\n"
+        link_markdown = f"\n[Email](mdc:{input.email_path})\n"
         updated_content = note_content + link_markdown
         write_note(input.note_name, updated_content)
     except FileNotFoundError:
@@ -693,3 +693,7 @@ def validate_note_template(input: ValidateNoteTemplateInput) -> bool:
         raise FileNotFoundError(f"{e}")
     except Exception as e:
         raise Exception(f"Error validating template: {e}")
+
+        Service Triggering Tool:
+
+        A tool implementation for agent to manually trigger services to update the vault contents

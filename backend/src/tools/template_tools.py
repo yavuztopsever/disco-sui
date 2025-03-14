@@ -2,28 +2,31 @@ from typing import Dict, Any, Optional, List
 from .base_tools import BaseTool
 import jinja2
 import os
+from pathlib import Path
 
-class CreateTemplateTool(BaseTool):
-    name = "create_template"
-    description = "Create a new template in the vault"
-    inputs = {
-        "name": {
-            "type": "string",
-            "description": "The name of the template"
-        },
-        "content": {
-            "type": "string",
-            "description": "The content of the template"
-        },
-        "folder": {
-            "type": "string",
-            "description": "Optional folder path where to create the template",
-            "nullable": True
-        }
-    }
-    output_type = "object"
+from ..core.tool_interfaces import TemplateTool
 
-    def forward(self, name: str, content: str, folder: Optional[str] = None) -> Dict[str, Any]:
+class CreateTemplateTool(TemplateTool):
+    """Tool for creating templates."""
+    
+    async def forward(
+        self,
+        name: str,
+        content: str,
+        description: Optional[str] = None,
+        variables: Optional[Dict[str, str]] = None
+    ) -> Dict[str, Any]:
+        """Create a new template.
+        
+        Args:
+            name: Template name
+            content: Template content
+            description: Template description
+            variables: Template variable descriptions
+            
+        Returns:
+            Creation results
+        """
         try:
             # Validate and sanitize the name
             name = name.strip()
@@ -32,8 +35,6 @@ class CreateTemplateTool(BaseTool):
 
             # Create templates folder path
             templates_folder = os.path.join(self.vault_path, '.templates')
-            if folder:
-                templates_folder = os.path.join(templates_folder, folder)
             self._ensure_path_exists(templates_folder)
 
             # Create the template file path
@@ -136,72 +137,26 @@ class ListTemplatesTool(BaseTool):
                 "error": str(e)
             }
 
-class ApplyTemplateTool(BaseTool):
-    name = "apply_template"
-    description = "Apply a template to create a new note"
-    inputs = {
-        "template_name": {
-            "type": "string",
-            "description": "The name of the template to apply"
-        },
-        "title": {
-            "type": "string",
-            "description": "The title for the new note"
-        },
-        "folder": {
-            "type": "string",
-            "description": "Optional folder path where to create the note",
-            "nullable": True
-        },
-        "context": {
-            "type": "object",
-            "description": "Optional context data for template variables",
-            "nullable": True
-        }
-    }
-    output_type = "object"
-
-    def forward(self, template_name: str, title: str, folder: Optional[str] = None, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        try:
-            # Get templates folder path
-            templates_folder = os.path.join(self.vault_path, '.templates')
-            template_path = os.path.join(templates_folder, f"{template_name}.md")
-
-            # Check if template exists
-            if not os.path.exists(template_path):
-                raise FileNotFoundError(f"Template '{template_name}' not found")
-
-            # Read template content
-            template_content = self._read_file(template_path)
-
-            # Create Jinja2 environment
-            env = jinja2.Environment(
-                loader=jinja2.FileSystemLoader(templates_folder),
-                autoescape=True
-            )
-
-            # Load and render template
-            template = env.from_string(template_content)
-            rendered_content = template.render(**(context or {}))
-
-            # Create note from template
-            note_folder = self._get_full_path(folder) if folder else self.vault_path
-            self._ensure_path_exists(note_folder)
-
-            note_path = os.path.join(note_folder, f"{title}.md")
-            self._write_file(note_path, rendered_content)
-
-            return {
-                "success": True,
-                "message": f"Template '{template_name}' applied to create note '{title}' successfully",
-                "path": os.path.relpath(note_path, self.vault_path)
-            }
-        except Exception as e:
-            return {
-                "success": False,
-                "message": f"Failed to apply template: {str(e)}",
-                "error": str(e)
-            }
+class ApplyTemplateTool(TemplateTool):
+    """Tool for applying templates."""
+    
+    async def forward(
+        self,
+        template_name: str,
+        variables: Optional[Dict[str, Any]] = None,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Apply a template.
+        
+        Args:
+            template_name: Name of the template
+            variables: Template variables
+            **kwargs: Additional template parameters
+            
+        Returns:
+            Processed template
+        """
+        return await self.apply_template(template_name, variables, **kwargs)
 
 class GetTemplateContentTool(BaseTool):
     name = "get_template_content"

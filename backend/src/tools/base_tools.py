@@ -1,12 +1,26 @@
 from smolagents import Tool
-from typing import Dict, Any, Optional, List, Type
+from typing import Dict, Any, Optional, List, Type, Union, Callable, Awaitable
 from pydantic import BaseModel, Field
 import os
 import json
 from pathlib import Path
 import logging
+import asyncio
+from src.core.exceptions import (
+    DiscoSuiError,
+    FileSystemError,
+    ValidationError,
+    ResourceNotFoundError,
+    NoteNotFoundError,
+    FrontmatterError,
+    ToolError
+)
 
-logger = logging.getLogger(__name__)
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 
 class ToolResponse(BaseModel):
     """Base model for tool responses."""
@@ -14,47 +28,194 @@ class ToolResponse(BaseModel):
     result: Optional[Any] = Field(None, description="The result of the tool execution")
     error: Optional[str] = Field(None, description="Error message if execution failed")
     metadata: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Additional metadata about the execution")
+    execution_time: Optional[float] = Field(None, description="Time taken to execute the tool in seconds")
 
 class BaseTool(Tool):
     """Base class for all tools with common functionality."""
     
-    def __init__(self, vault_path: str):
+    def __init__(self, vault_path: Optional[str] = None):
+        """Initialize the base tool.
+        
+        Args:
+            vault_path (Optional[str]): Path to the Obsidian vault. If None, will be loaded from config.
+            
+        Raises:
+            FileSystemError: If vault path is invalid or inaccessible
+        """
         super().__init__()
         self.vault_path = vault_path
+        if vault_path and not os.path.exists(vault_path):
+            raise FileSystemError(f"Vault path does not exist: {vault_path}")
         self.logger = logging.getLogger(self.__class__.__name__)
+        self._task_queue: asyncio.Queue = asyncio.Queue()
+        self._background_tasks: List[asyncio.Task] = []
         
-    def _ensure_path_exists(self, path: str) -> None:
-        """Ensure a directory path exists."""
+    async def initialize(self) -> None:
+        """Initialize the tool asynchronously.
+        
+        This method should be overridden by subclasses that need async initialization.
+        """
+        pass
+        
+    async def cleanup(self) -> None:
+        """Clean up tool resources asynchronously.
+        
+        This method should be overridden by subclasses that need async cleanup.
+        """
+        # Cancel any running background tasks
+        for task in self._background_tasks:
+            if not task.done():
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+        self._background_tasks.clear()
+        
+    async def execute(self, action: str, **kwargs) -> ToolResponse:
+        """Execute a tool action asynchronously.
+        
+        Args:
+            action (str): The action to execute
+            **kwargs: Additional arguments for the action
+            
+        Returns:
+            ToolResponse: The result of the tool execution
+            
+        Raises:
+            ToolError: If the action fails
+        """
+        start_time = asyncio.get_event_loop().time()
+        try:
+            # Validate inputs
+            self._validate_inputs(kwargs, self.get_required_fields(action))
+            
+            # Execute the action
+            handler = getattr(self, f"_{action}", None)
+            if not handler or not callable(handler):
+                raise ToolError(f"Invalid action: {action}")
+                
+            result = await handler(**kwargs)
+            execution_time = asyncio.get_event_loop().time() - start_time
+            
+            return ToolResponse(
+                success=True,
+                result=result,
+                execution_time=execution_time
+            )
+            
+        except Exception as e:
+            execution_time = asyncio.get_event_loop().time() - start_time
+            self.logger.error(f"Tool execution failed: {str(e)}", exc_info=True)
+            return ToolResponse(
+                success=False,
+                error=str(e),
+                execution_time=execution_time
+            )
+            
+    def add_background_task(self, coro: Awaitable[Any]) -> asyncio.Task:
+        """Add a background task to be managed by the tool.
+        
+        Args:
+            coro: The coroutine to run in the background
+            
+        Returns:
+            asyncio.Task: The created task
+        """
+        task = asyncio.create_task(coro)
+        self._background_tasks.append(task)
+        task.add_done_callback(lambda t: self._background_tasks.remove(t))
+        return task
+        
+    async def _ensure_path_exists(self, path: str) -> None:
+        """Ensure a directory path exists asynchronously.
+        
+        Args:
+            path (str): Path to ensure exists
+            
+        Raises:
+            FileSystemError: If path cannot be created
+        """
         try:
             os.makedirs(path, exist_ok=True)
         except Exception as e:
             self.logger.error(f"Failed to create path {path}: {str(e)}")
-            raise
+            raise FileSystemError(f"Failed to create path {path}: {str(e)}")
         
     def _get_full_path(self, relative_path: str) -> str:
-        """Get the full path for a given relative path."""
-        return os.path.join(self.vault_path, relative_path)
+        """Get the full path for a given relative path.
         
-    def _read_file(self, file_path: str) -> str:
-        """Read content from a file."""
+        Args:
+            relative_path (str): Path relative to vault root
+            
+        Returns:
+            str: Full absolute path
+            
+        Raises:
+            ValidationError: If path is invalid
+        """
         try:
+            full_path = os.path.join(self.vault_path, relative_path)
+            if not self._validate_path(full_path):
+                raise ValidationError(f"Invalid path: {relative_path}")
+            return full_path
+        except Exception as e:
+            raise ValidationError(f"Error processing path: {str(e)}")
+        
+    async def _read_file(self, file_path: str) -> str:
+        """Read content from a file asynchronously.
+        
+        Args:
+            file_path (str): Path to the file to read
+            
+        Returns:
+            str: File contents
+            
+        Raises:
+            NoteNotFoundError: If file does not exist
+            FileSystemError: If file cannot be read
+        """
+        try:
+            if not os.path.exists(file_path):
+                raise NoteNotFoundError(f"File not found: {file_path}")
             with open(file_path, 'r', encoding='utf-8') as f:
                 return f.read()
+        except NoteNotFoundError:
+            raise
         except Exception as e:
             self.logger.error(f"Failed to read file {file_path}: {str(e)}")
-            raise Exception(f"Error reading file {file_path}: {str(e)}")
+            raise FileSystemError(f"Error reading file {file_path}: {str(e)}")
             
-    def _write_file(self, file_path: str, content: str) -> None:
-        """Write content to a file."""
+    async def _write_file(self, file_path: str, content: str) -> None:
+        """Write content to a file asynchronously.
+        
+        Args:
+            file_path (str): Path to the file to write
+            content (str): Content to write
+            
+        Raises:
+            FileSystemError: If file cannot be written
+        """
         try:
             with open(file_path, 'w', encoding='utf-8') as f:
                 f.write(content)
         except Exception as e:
             self.logger.error(f"Failed to write to file {file_path}: {str(e)}")
-            raise Exception(f"Error writing to file {file_path}: {str(e)}")
+            raise FileSystemError(f"Error writing to file {file_path}: {str(e)}")
             
-    def _list_files(self, directory: str, extension: str = '.md') -> List[str]:
-        """List files with given extension in a directory."""
+    async def _list_files(self, directory: str, extension: str = '.md') -> List[str]:
+        """List files with given extension in a directory asynchronously.
+        
+        Args:
+            directory (str): Directory to list files from
+            extension (str, optional): File extension to filter by. Defaults to '.md'.
+            
+        Returns:
+            List[str]: List of relative file paths
+            
+        Raises:
+            FileSystemError: If directory cannot be read
+        """
         try:
             files = []
             for root, _, filenames in os.walk(directory):
@@ -65,10 +226,20 @@ class BaseTool(Tool):
             return files
         except Exception as e:
             self.logger.error(f"Failed to list files in {directory}: {str(e)}")
-            raise Exception(f"Error listing files in {directory}: {str(e)}")
+            raise FileSystemError(f"Error listing files in {directory}: {str(e)}")
             
-    def _get_frontmatter(self, content: str) -> Dict[str, Any]:
-        """Extract frontmatter from markdown content."""
+    async def _get_frontmatter(self, content: str) -> Dict[str, Any]:
+        """Extract frontmatter from markdown content asynchronously.
+        
+        Args:
+            content (str): Markdown content
+            
+        Returns:
+            Dict[str, Any]: Parsed frontmatter
+            
+        Raises:
+            FrontmatterError: If frontmatter cannot be parsed
+        """
         try:
             if not content.startswith('---'):
                 return {}
@@ -80,10 +251,21 @@ class BaseTool(Tool):
             frontmatter = parts[1].strip()
             return json.loads(frontmatter)
         except Exception as e:
-            raise Exception(f"Error parsing frontmatter: {str(e)}")
+            raise FrontmatterError(f"Error parsing frontmatter: {str(e)}")
             
-    def _update_frontmatter(self, content: str, frontmatter: Dict[str, Any]) -> str:
-        """Update frontmatter in markdown content."""
+    async def _update_frontmatter(self, content: str, frontmatter: Dict[str, Any]) -> str:
+        """Update frontmatter in markdown content asynchronously.
+        
+        Args:
+            content (str): Original markdown content
+            frontmatter (Dict[str, Any]): New frontmatter
+            
+        Returns:
+            str: Updated content
+            
+        Raises:
+            FrontmatterError: If frontmatter cannot be updated
+        """
         try:
             if not content.startswith('---'):
                 return f"---\n{json.dumps(frontmatter, indent=2)}\n---\n\n{content}"
@@ -94,38 +276,64 @@ class BaseTool(Tool):
                 
             return f"---\n{json.dumps(frontmatter, indent=2)}\n---\n{parts[2]}"
         except Exception as e:
-            raise Exception(f"Error updating frontmatter: {str(e)}")
+            raise FrontmatterError(f"Error updating frontmatter: {str(e)}")
             
     def _validate_path(self, path: str) -> bool:
-        """Validate if a path is within the vault directory."""
+        """Validate if a path is within the vault directory.
+        
+        Args:
+            path (str): Path to validate
+            
+        Returns:
+            bool: True if path is valid
+        """
         try:
-            full_path = os.path.abspath(self._get_full_path(path))
+            full_path = os.path.abspath(path)
             vault_path = os.path.abspath(self.vault_path)
             return full_path.startswith(vault_path)
         except Exception:
-            return False 
+            return False
 
     def _validate_inputs(self, inputs: Dict[str, Any], required_fields: List[str]) -> None:
-        """Validate required input fields."""
+        """Validate required input fields.
+        
+        Args:
+            inputs (Dict[str, Any]): Input dictionary
+            required_fields (List[str]): List of required field names
+            
+        Raises:
+            ValidationError: If required fields are missing
+        """
         missing_fields = [field for field in required_fields if field not in inputs]
         if missing_fields:
-            raise ValueError(f"Missing required fields: {', '.join(missing_fields)}")
+            raise ValidationError(f"Missing required fields: {', '.join(missing_fields)}")
 
-    def _format_response(self, success: bool, result: Any = None, error: str = None, metadata: Dict[str, Any] = None) -> ToolResponse:
-        """Format a standardized tool response."""
-        return ToolResponse(
-            success=success,
-            result=result,
-            error=error,
-            metadata=metadata or {}
-        )
+    def get_required_fields(self, action: str) -> List[str]:
+        """Get required fields for a specific action.
+        
+        Args:
+            action (str): The action to get required fields for
+            
+        Returns:
+            List[str]: List of required field names
+        """
+        # This should be overridden by subclasses to specify required fields per action
+        return []
 
     def get_examples(self) -> List[Dict[str, Any]]:
-        """Get example usage of the tool."""
+        """Get example usage of the tool.
+        
+        Returns:
+            List[Dict[str, Any]]: List of example usages
+        """
         return getattr(self, 'examples', [])
 
     def get_documentation(self) -> Dict[str, Any]:
-        """Get comprehensive documentation for the tool."""
+        """Get comprehensive documentation for the tool.
+        
+        Returns:
+            Dict[str, Any]: Tool documentation
+        """
         return {
             'name': self.name,
             'description': self.description,

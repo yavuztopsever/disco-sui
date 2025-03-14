@@ -8,6 +8,68 @@ from sentence_transformers import SentenceTransformer
 from sklearn.cluster import KMeans
 import faiss
 import pickle
+from pathlib import Path
+
+from ..core.tool_interfaces import AnalysisTool
+
+class MetadataExtractionTool(AnalysisTool):
+    """Tool for extracting metadata from content."""
+    
+    async def forward(
+        self,
+        content: str,
+        metadata_types: Optional[List[str]] = None,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Extract metadata from content.
+        
+        Args:
+            content: Content to analyze
+            metadata_types: Types of metadata to extract
+            **kwargs: Additional extraction parameters
+            
+        Returns:
+            Extracted metadata
+        """
+        return await self.extract_metadata(content, metadata_types, **kwargs)
+
+class IndexAnalysisTool(AnalysisTool):
+    """Tool for analyzing content structure and organization."""
+    
+    async def forward(
+        self,
+        content: str,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Analyze content structure.
+        
+        Args:
+            content: Content to analyze
+            **kwargs: Additional analysis parameters
+            
+        Returns:
+            Analysis results
+        """
+        return await self.analyze_content(content, analysis_type="structure", **kwargs)
+
+class LinkAnalysisTool(AnalysisTool):
+    """Tool for analyzing links between content."""
+    
+    async def forward(
+        self,
+        content: str,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Analyze content links.
+        
+        Args:
+            content: Content to analyze
+            **kwargs: Additional analysis parameters
+            
+        Returns:
+            Analysis results
+        """
+        return await self.analyze_content(content, analysis_type="links", **kwargs)
 
 class IndexNoteTool(BaseTool):
     name = "index_note"

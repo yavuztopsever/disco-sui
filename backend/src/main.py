@@ -248,6 +248,32 @@ async def list_tools(api_key: str = Depends(verify_api_key)):
         logger.error(f"Error retrieving tools: {str(e)}")
         raise NoteManagementError(f"Error retrieving tools: {str(e)}")
 
+@app.get("/health")
+async def health_check():
+    """
+    Health check endpoint for monitoring service health.
+    
+    Returns:
+    - status: The current status of the service
+    - version: The current version of the API
+    """
+    try:
+        # Check Redis connection
+        await app.state.redis.ping()
+        redis_status = "healthy"
+    except Exception as e:
+        logger.error(f"Redis health check failed: {str(e)}")
+        redis_status = "unhealthy"
+
+    return {
+        "status": "healthy",
+        "version": app.version,
+        "components": {
+            "api": "healthy",
+            "redis": redis_status
+        }
+    }
+
 def custom_openapi():
     if app.openapi_schema:
         return app.openapi_schema

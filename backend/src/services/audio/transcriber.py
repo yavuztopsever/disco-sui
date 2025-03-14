@@ -8,9 +8,9 @@ import whisper
 import torch
 from pydantic import BaseModel
 
-from ...core.config import Settings
-from ...core.exceptions import AudioTranscriptionError
-from ...core.logging import get_logger
+from src.core.config import Settings
+from src.core.exceptions import AudioTranscriptionError
+from src.core.logging import get_logger
 
 logger = get_logger(__name__)
 

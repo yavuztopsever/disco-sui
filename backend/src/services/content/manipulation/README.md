@@ -39,7 +39,7 @@ python -m src.features.note_management.cli template schedule status
 ### Python API
 
 ```python
-from src.features.note_management import TemplateEnforcementTool, TemplateScheduler
+from src.services.content.manipulation import TemplateEnforcementTool, TemplateScheduler
 
 # Validate a note
 tool = TemplateEnforcementTool()
