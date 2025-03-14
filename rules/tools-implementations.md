@@ -1,8 +1,3 @@
----
-description: Detailed Tool Implementations
-globs: 
-alwaysApply: false
----
 Custom tools:
 
 audio_tools.py: Handles audio transcription and linking, which are core features for integrating audio content.
@@ -70,7 +65,7 @@ def link_audio_to_note(input: LinkAudioInput) -> None:
     """
     try:
         note_content = read_note(input.note_name)
-        link_markdown = f"\n[Audio](mdc:{input.audio_path})\n"
+        link_markdown = f"\n@Audio\n"
         updated_content = note_content + link_markdown
         write_note(input.note_name, updated_content)
     except FileNotFoundError:
@@ -199,7 +194,7 @@ def link_email_to_note(input: LinkEmailInput) -> None:
     """
     try:
         note_content = read_note(input.note_name)
-        link_markdown = f"\n[Email](mdc:{input.email_path})\n"
+        link_markdown = f"\n@Email\n"
         updated_content = note_content + link_markdown
         write_note(input.note_name, updated_content)
     except FileNotFoundError:

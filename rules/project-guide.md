@@ -1,8 +1,3 @@
----
-description: Full Development Guide
-globs: 
-alwaysApply: false
----
 # DiscoSui - Your Intelligent Obsidian Companion
 
 ## 1. Project Overview

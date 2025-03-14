@@ -1,315 +1,329 @@
-from typing import Dict, List, Optional, Any, Type
-import asyncio
+from typing import Dict, List, Optional, Any, Type, Union
 from pydantic import BaseModel
 import logging
 from datetime import datetime
+import asyncio
 from pathlib import Path
-from smolagents import Agent, Tool
 
-from .config import Settings, AgentConfig
+from .config import Settings
 from .exceptions import AgentError, StrategyError, ContextError
 from .tool_manager import ToolManager
-from .logging import get_logger
-from .memory import MemoryManager, Memory
+from .memory import MemoryManager
 from .context import ContextManager
-from .strategy import StrategyManager, ExecutionStrategy
+from .strategy import StrategyManager
 from .monitoring import PerformanceMonitor
+from .integration import (
+    IntegrationLayer,
+    IntegrationConfig,
+    RequestContext,
+    RequestType,
+    ContextSource
+)
 
 logger = logging.getLogger(__name__)
 
+class AgentMetrics(BaseModel):
+    """Metrics tracked by the agent."""
+    response_time: float = 0.0
+    memory_usage: float = 0.0
+    success_rate: float = 0.0
+    rag_usage: float = 0.0
+    tool_usage: float = 0.0
+    error_count: int = 0
+    request_count: int = 0
+    last_update: datetime = datetime.now()
+
 class AgentResponse(BaseModel):
     """Response from the agent including the action to take and any relevant data."""
+    success: bool
     action: str
     data: Dict[str, Any]
     message: Optional[str] = None
+    context: RequestContext
+    execution_time: float = 0.0
+    metrics: Optional[AgentMetrics] = None
 
 class AgentState(BaseModel):
     """Agent's current state and configuration."""
-    active_context: Dict[str, Any] = {}
+    active_context: Optional[RequestContext] = None
     active_strategy: Optional[str] = None
     last_execution_time: Optional[datetime] = None
-    performance_metrics: Dict[str, float] = {}
-    error_count: int = 0
+    metrics: AgentMetrics = AgentMetrics()
+    is_processing: bool = False
+    last_error: Optional[str] = None
 
-class EnhancedSmolAgent(Agent):
-    """Enhanced agent implementation using smolagents with sophisticated capabilities."""
+class Agent:
+    """Enhanced agent implementation with sophisticated capabilities."""
     
-    def __init__(self, settings: Settings, tool_manager: ToolManager):
-        """Initialize the enhanced agent with configuration and tools."""
-        super().__init__()
+    def __init__(self, settings: Settings):
+        """Initialize the agent with configuration."""
         self.settings = settings
-        self.tool_manager = tool_manager
         self.state = AgentState()
         
-        # Core components
-        self.memory_manager = MemoryManager()
-        self.context_manager = ContextManager()
-        self.strategy_manager = StrategyManager()
+        # Initialize integration layer
+        self.integration = IntegrationLayer(
+            config=IntegrationConfig(
+                memory_config=settings.memory_config,
+                context_config=settings.context_config,
+                strategy_config=settings.strategy_config,
+                tool_config=settings.tool_config
+            )
+        )
+        
+        # Initialize performance monitoring
         self.performance_monitor = PerformanceMonitor()
+        self._initialize_monitoring()
         
-        # Initialize components
-        self._initialize_components()
-        
-    def _initialize_components(self):
-        """Initialize agent components and monitoring."""
-        # Setup monitoring
-        self.performance_monitor.register_metric("response_time")
-        self.performance_monitor.register_metric("memory_usage")
-        self.performance_monitor.register_metric("success_rate")
-        
-        # Initialize tools from tool manager
-        self.tools = self.tool_manager.get_all_tools()
-        
+    def _initialize_monitoring(self):
+        """Initialize performance monitoring metrics."""
+        metrics = [
+            "response_time",
+            "memory_usage",
+            "success_rate",
+            "rag_usage",
+            "tool_usage",
+            "error_rate",
+            "request_throughput"
+        ]
+        for metric in metrics:
+            self.performance_monitor.register_metric(metric)
+            
     async def process_request(
         self,
         user_input: str,
-        context: Optional[Dict[str, Any]] = None
+        additional_context: Optional[Dict[str, Any]] = None
     ) -> AgentResponse:
         """Process a user request with enhanced capabilities."""
+        if self.state.is_processing:
+            return self._create_busy_response()
+            
+        self.state.is_processing = True
         start_time = datetime.now()
         
         try:
-            # Update monitoring
+            # Start monitoring
             self.performance_monitor.start_operation("request_processing")
             
-            # Analyze request and build context
-            request_context = await self.context_manager.analyze_request(user_input)
-            
-            # Get relevant tools based on user input
-            relevant_tools = self.tool_manager.get_relevant_tools(user_input)
-            
-            # Determine if RAG is needed
-            if self.tool_manager.should_use_rag(user_input):
-                rag_context = await self.tool_manager.get_rag_context(user_input)
-                request_context.update(rag_context)
-            
-            # Merge contexts
-            full_context = await self.context_manager.merge_contexts(
-                request_context,
-                context or {},
-                await self.memory_manager.get_relevant_context(user_input)
-            )
-            
-            # Get execution strategy
-            strategy = await self.strategy_manager.get_strategy(
+            # Process request through integration layer
+            result = await self.integration.process_request(
                 user_input,
-                full_context
-            )
-            self.state.active_strategy = strategy.name
-            
-            # Execute tool chain with strategy
-            result = await self._execute_tool_chain(
-                user_input,
-                relevant_tools,
-                full_context,
-                strategy
+                additional_context
             )
             
-            # Update memory
-            await self.memory_manager.store_interaction(
-                user_input,
-                result,
-                full_context
-            )
-            
-            # Learn from interaction
-            await self._learn_from_interaction(
-                user_input,
-                result,
-                full_context
-            )
+            # Update state
+            self._update_state(result)
             
             # Update metrics
-            self._update_metrics(start_time, success=True)
+            execution_time = (datetime.now() - start_time).total_seconds()
+            self._update_metrics(execution_time, result)
             
-            return AgentResponse(
-                action=result.get("action", "response"),
-                data=result.get("data", {}),
-                message=result.get("message")
-            )
+            return self._create_success_response(result, execution_time)
             
         except Exception as e:
-            # Handle error and update metrics
-            self._update_metrics(start_time, success=False)
+            logger.error(f"Request processing failed: {e}")
+            self.state.error_count += 1
+            self.state.last_error = str(e)
             return await self._handle_error(e)
-        
+            
         finally:
+            self.state.is_processing = False
             self.performance_monitor.end_operation("request_processing")
             
-    async def _execute_tool_chain(
-        self,
-        user_input: str,
-        tools: List[Tool],
-        context: Dict[str, Any],
-        strategy: ExecutionStrategy
-    ) -> Dict[str, Any]:
-        """Execute a chain of tools based on strategy."""
-        current_context = context.copy()
+    def _create_busy_response(self) -> AgentResponse:
+        """Create response when agent is busy."""
+        return AgentResponse(
+            success=False,
+            action="error",
+            data={"error": "Agent is busy"},
+            message="Please wait for the current request to complete.",
+            context=self.state.active_context or RequestContext(
+                request_id="error",
+                request_type=RequestType.SYSTEM,
+                raw_request="busy"
+            ),
+            metrics=self.state.metrics
+        )
         
-        try:
-            for step in strategy.steps:
-                # Get tools for this step
-                step_tools = [t for t in tools if t.name in step.tool_names]
-                
-                for tool in step_tools:
-                    # Execute tool with current context
-                    result = await tool.execute(
-                        input=user_input,
-                        context=current_context
-                    )
-                    
-                    # Update context with tool result
-                    if isinstance(result, dict):
-                        current_context.update(result)
-                    
-                    # Check if we need to stop the chain
-                    if result.get("final", False):
-                        return result
-                    
-                    # Update metrics for tool execution
-                    await self.strategy_manager.update_tool_metrics(
-                        tool.name,
-                        result
-                    )
-                    
-            return current_context
-            
-        except Exception as e:
-            logger.error(f"Error executing tool chain: {e}")
-            raise AgentError(f"Tool chain execution failed: {str(e)}")
-            
-    async def _learn_from_interaction(
+    def _create_success_response(
         self,
-        user_input: str,
-        result: Dict[str, Any],
-        context: Dict[str, Any]
-    ):
-        """Learn from the interaction to improve future performance."""
-        try:
-            # Update strategy performance metrics
-            await self.strategy_manager.update_performance(
-                self.state.active_strategy,
-                result
-            )
-            
-            # Learn context patterns
-            await self.context_manager.learn_patterns(
-                user_input,
-                context,
-                result
-            )
-            
-            # Optimize memory retrieval
-            await self.memory_manager.optimize_retrieval(
-                user_input,
-                result
-            )
-            
-            # Update tool manager's relevance model
-            await self.tool_manager.update_relevance_model(
-                user_input,
-                [tool.name for tool in self.tools],
-                result
-            )
-            
-        except Exception as e:
-            logger.error(f"Learning from interaction failed: {e}")
-            
-    def _update_metrics(self, start_time: datetime, success: bool):
-        """Update agent performance metrics."""
-        execution_time = (datetime.now() - start_time).total_seconds()
+        result: Any,
+        execution_time: float
+    ) -> AgentResponse:
+        """Create success response."""
+        return AgentResponse(
+            success=result.success,
+            action=result.result.get("action", "response"),
+            data=result.result,
+            message=result.result.get("message"),
+            context=result.context,
+            execution_time=execution_time,
+            metrics=self.state.metrics
+        )
         
+    def _update_state(self, result: Any):
+        """Update agent state with execution result."""
+        self.state.active_context = result.context
+        self.state.active_strategy = result.strategy_id
         self.state.last_execution_time = datetime.now()
-        self.state.performance_metrics["last_execution_time"] = execution_time
         
-        if success:
-            self.state.performance_metrics["success_rate"] = (
-                self.state.performance_metrics.get("success_rate", 0) * 0.9 + 0.1
+    def _update_metrics(self, execution_time: float, result: Any):
+        """Update agent metrics."""
+        metrics = self.state.metrics
+        
+        # Update basic metrics
+        metrics.response_time = execution_time
+        metrics.request_count += 1
+        metrics.last_update = datetime.now()
+        
+        # Update success rate
+        if result.success:
+            metrics.success_rate = (
+                metrics.success_rate * 0.9 + 0.1
             )
         else:
-            self.state.performance_metrics["success_rate"] = (
-                self.state.performance_metrics.get("success_rate", 0) * 0.9
-            )
-            self.state.error_count += 1
+            metrics.success_rate *= 0.9
+            metrics.error_count += 1
             
+        # Update RAG and tool usage
+        if result.context.contexts.get(ContextSource.RAG):
+            metrics.rag_usage += 1
+            
+        if "tool_usage" in result.result:
+            metrics.tool_usage += result.result["tool_usage"]
+            
+        # Update monitoring metrics
+        self._update_monitoring_metrics(metrics)
+        
+    def _update_monitoring_metrics(self, metrics: AgentMetrics):
+        """Update performance monitoring metrics."""
+        self.performance_monitor.record_metric(
+            "response_time",
+            metrics.response_time
+        )
+        self.performance_monitor.record_metric(
+            "success_rate",
+            metrics.success_rate
+        )
+        self.performance_monitor.record_metric(
+            "rag_usage",
+            metrics.rag_usage / max(metrics.request_count, 1)
+        )
+        self.performance_monitor.record_metric(
+            "tool_usage",
+            metrics.tool_usage / max(metrics.request_count, 1)
+        )
+        self.performance_monitor.record_metric(
+            "error_rate",
+            metrics.error_count / max(metrics.request_count, 1)
+        )
+        
     async def _handle_error(self, error: Exception) -> AgentResponse:
         """Handle errors with sophisticated error recovery."""
-        logger.error(f"Error in agent execution: {error}")
-        
         try:
             # Get error recovery strategy
-            recovery_strategy = await self.strategy_manager.get_recovery_strategy(error)
+            recovery_result = await self.integration.handle_error(error)
             
-            # Execute recovery if strategy exists
-            if recovery_strategy:
-                recovery_tools = self.tool_manager.get_tools_for_strategy(recovery_strategy)
-                recovery_result = await self._execute_tool_chain(
-                    str(error),
-                    recovery_tools,
-                    {"error": str(error), "error_type": type(error).__name__},
-                    recovery_strategy
-                )
-                
+            if recovery_result.success:
                 return AgentResponse(
+                    success=True,
                     action="error_recovery",
-                    data={
-                        "error": str(error),
-                        "recovery_attempted": True,
-                        "recovery_result": recovery_result
-                    },
-                    message="Error occurred but recovery was attempted"
+                    data=recovery_result.result,
+                    message="Error occurred but recovery was successful",
+                    context=recovery_result.context,
+                    metrics=self.state.metrics
                 )
                 
         except Exception as recovery_error:
             logger.error(f"Error recovery failed: {recovery_error}")
             
         return AgentResponse(
+            success=False,
             action="error",
             data={"error": str(error)},
-            message=f"An error occurred: {str(error)}"
+            message=f"An error occurred: {str(error)}",
+            context=self.state.active_context or RequestContext(
+                request_id="error",
+                request_type=RequestType.SYSTEM,
+                raw_request=str(error)
+            ),
+            metrics=self.state.metrics
         )
         
     async def optimize_performance(self):
-        """Optimize agent performance based on metrics."""
+        """Optimize agent performance."""
         try:
-            # Optimize strategy selection
-            await self.strategy_manager.optimize_strategies(
-                self.state.performance_metrics
-            )
+            # Optimize through integration layer
+            await self.integration.optimize_components()
             
-            # Optimize memory management
-            await self.memory_manager.optimize_storage()
-            
-            # Optimize context handling
-            await self.context_manager.optimize_patterns()
-            
-            # Optimize tool selection
-            await self.tool_manager.optimize_tool_selection(
-                self.state.performance_metrics
-            )
-            
-            # Clean up resources
-            await self._cleanup_resources()
+            # Reset state if error count is too high
+            if self.state.metrics.error_count > self.settings.max_error_threshold:
+                self.state = AgentState()
+                
+            # Update monitoring
+            await self.performance_monitor.analyze_metrics()
             
         except Exception as e:
             logger.error(f"Performance optimization failed: {e}")
             
-    async def _cleanup_resources(self):
+    async def get_status(self) -> Dict[str, Any]:
+        """Get comprehensive agent status."""
+        try:
+            # Get system status from integration layer
+            system_status = await self.integration.get_system_status()
+            
+            # Add agent-specific status
+            return {
+                "agent": {
+                    "is_processing": self.state.is_processing,
+                    "metrics": self.state.metrics.dict(),
+                    "last_execution": self.state.last_execution_time.isoformat()
+                    if self.state.last_execution_time else None,
+                    "last_error": self.state.last_error
+                },
+                "system": system_status,
+                "monitoring": self.performance_monitor.get_metrics()
+            }
+            
+        except Exception as e:
+            logger.error(f"Status retrieval failed: {e}")
+            return {"error": str(e)}
+            
+    async def cleanup(self):
         """Clean up agent resources."""
         try:
-            # Clean up memory
-            await self.memory_manager.cleanup()
+            # Cleanup through integration layer
+            await self.integration.cleanup()
             
-            # Clean up context
-            await self.context_manager.cleanup()
+            # Reset state
+            self.state = AgentState()
             
-            # Reset state if needed
-            if self.state.error_count > self.settings.max_error_threshold:
-                self.state = AgentState()
-                
+            # Clear monitoring
+            self.performance_monitor.reset()
+            
         except Exception as e:
-            logger.error(f"Resource cleanup failed: {e}")
-
-    def update_tools(self):
-        """Update the available tools from the tool manager."""
-        self.tools = self.tool_manager.get_all_tools() 
+            logger.error(f"Agent cleanup failed: {e}")
+            
+    async def validate(self) -> Dict[str, Any]:
+        """Validate agent and system components."""
+        try:
+            # Validate through integration layer
+            validation_results = await self.integration.validate_system()
+            
+            # Add agent validation
+            validation_results["agent"] = {
+                "status": "ok" if self.state.metrics.error_count < self.settings.max_error_threshold else "warning",
+                "details": {
+                    "metrics": self.state.metrics.dict(),
+                    "is_processing": self.state.is_processing,
+                    "last_error": self.state.last_error
+                }
+            }
+            
+            return validation_results
+            
+        except Exception as e:
+            logger.error(f"Validation failed: {e}")
+            return {
+                "status": "error",
+                "error": str(e)
+            } 
