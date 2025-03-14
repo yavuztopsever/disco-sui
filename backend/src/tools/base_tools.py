@@ -18,6 +18,8 @@ from src.core.exceptions import (
 from datetime import datetime
 import yaml
 import jsonschema
+import time
+import uuid
 
 # Configure logging
 logging.basicConfig(
@@ -27,12 +29,17 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 class ToolResponse(BaseModel):
-    """Base model for tool responses."""
+    """Base model for tool responses following smolagents response format."""
     success: bool = Field(..., description="Whether the tool execution was successful")
     result: Optional[Any] = Field(None, description="The result of the tool execution")
     error: Optional[str] = Field(None, description="Error message if execution failed")
-    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Additional metadata about the execution")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata about the execution")
     execution_time: Optional[float] = Field(None, description="Time taken to execute the tool in seconds")
+    tool_name: str = Field(..., description="Name of the tool that was executed")
+    timestamp: str = Field(default_factory=lambda: datetime.now().isoformat(), description="Timestamp of the execution")
+    parameters: Dict[str, Any] = Field(default_factory=dict, description="Parameters used in the execution")
+    warnings: List[str] = Field(default_factory=list, description="Warning messages from the execution")
+    validation_errors: List[str] = Field(default_factory=list, description="Validation errors encountered")
 
 class BaseTool(Tool):
     """Base class for all DiscoSui tools following smolagents Tool interface."""
@@ -41,6 +48,10 @@ class BaseTool(Tool):
         """Initialize the base tool."""
         super().__init__()
         self.logger = logging.getLogger(self.__class__.__name__)
+        self._execution_start: Optional[float] = None
+        self._execution_end: Optional[float] = None
+        self._warnings: List[str] = []
+        self._validation_errors: List[str] = []
         
     async def execute(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Execute the tool with the given parameters.
@@ -57,18 +68,27 @@ class BaseTool(Tool):
             ToolError: If tool execution fails
         """
         try:
+            # Start execution timing
+            self._execution_start = time.time()
+            self._warnings = []
+            self._validation_errors = []
+            
             # Validate parameters
             self._validate_parameters(parameters)
             
             # Execute tool-specific logic
             result = await self._execute_tool(parameters)
             
+            # End execution timing
+            self._execution_end = time.time()
+            
             # Format response
-            return self._format_response(result)
+            return self._format_response(result, parameters)
             
         except Exception as e:
+            self._execution_end = time.time()
             self.logger.error(f"Tool execution failed: {str(e)}")
-            return self._format_error(str(e))
+            return self._format_error(str(e), parameters)
             
     def _validate_parameters(self, parameters: Dict[str, Any]) -> None:
         """Validate input parameters against tool schema.
@@ -86,18 +106,27 @@ class BaseTool(Tool):
             # Check required parameters
             for param_name, param_info in schema["inputs"].items():
                 if param_info.get("required", False) and param_name not in parameters:
-                    raise ValidationError(f"Missing required parameter: {param_name}")
+                    self._validation_errors.append(f"Missing required parameter: {param_name}")
                     
             # Validate parameter types
             for param_name, param_value in parameters.items():
                 if param_name in schema["inputs"]:
                     param_info = schema["inputs"][param_name]
                     if not self._validate_parameter_type(param_value, param_info["type"]):
-                        raise ValidationError(
+                        self._validation_errors.append(
                             f"Invalid type for parameter {param_name}. "
                             f"Expected {param_info['type']}, got {type(param_value)}"
                         )
+                    # Validate enum values if specified
+                    if "enum" in param_info and param_value not in param_info["enum"]:
+                        self._validation_errors.append(
+                            f"Invalid value for parameter {param_name}. "
+                            f"Must be one of: {param_info['enum']}"
+                        )
                         
+            if self._validation_errors:
+                raise ValidationError("\n".join(self._validation_errors))
+                
         except Exception as e:
             raise ValidationError(f"Parameter validation failed: {str(e)}")
             
@@ -117,7 +146,8 @@ class BaseTool(Tool):
             "number": (int, float),
             "boolean": bool,
             "array": list,
-            "object": dict
+            "object": dict,
+            "any": object
         }
         
         if expected_type not in type_map:
@@ -142,41 +172,66 @@ class BaseTool(Tool):
         """
         raise NotImplementedError("Tool implementation must override _execute_tool method")
         
-    def _format_response(self, result: Any) -> Dict[str, Any]:
+    def _format_response(self, result: Any, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Format the tool execution result.
         
         Args:
             result (Any): The raw execution result
+            parameters (Dict[str, Any]): The execution parameters
             
         Returns:
             Dict[str, Any]: The formatted response
         """
-        return {
-            "success": True,
-            "result": result,
-            "metadata": {
-                "tool_name": self.name,
-                "timestamp": datetime.now().isoformat()
-            }
-        }
+        execution_time = self._execution_end - self._execution_start if self._execution_end and self._execution_start else None
         
-    def _format_error(self, error: str) -> Dict[str, Any]:
+        return ToolResponse(
+            success=True,
+            result=result,
+            tool_name=self.name,
+            execution_time=execution_time,
+            parameters=parameters,
+            warnings=self._warnings,
+            validation_errors=self._validation_errors,
+            metadata={
+                "tool_version": getattr(self, "version", "1.0.0"),
+                "execution_id": str(uuid.uuid4())
+            }
+        ).dict()
+        
+    def _format_error(self, error: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Format an error response.
         
         Args:
             error (str): The error message
+            parameters (Dict[str, Any]): The execution parameters
             
         Returns:
             Dict[str, Any]: The formatted error response
         """
-        return {
-            "success": False,
-            "error": error,
-            "metadata": {
-                "tool_name": self.name,
-                "timestamp": datetime.now().isoformat()
+        execution_time = self._execution_end - self._execution_start if self._execution_end and self._execution_start else None
+        
+        return ToolResponse(
+            success=False,
+            error=error,
+            tool_name=self.name,
+            execution_time=execution_time,
+            parameters=parameters,
+            warnings=self._warnings,
+            validation_errors=self._validation_errors,
+            metadata={
+                "tool_version": getattr(self, "version", "1.0.0"),
+                "execution_id": str(uuid.uuid4())
             }
-        }
+        ).dict()
+        
+    def add_warning(self, warning: str) -> None:
+        """Add a warning message.
+        
+        Args:
+            warning (str): The warning message to add
+        """
+        self._warnings.append(warning)
+        self.logger.warning(warning)
         
     def get_schema(self) -> Dict[str, Any]:
         """Get the tool's schema.
@@ -190,7 +245,10 @@ class BaseTool(Tool):
             "name": self.name,
             "description": self.description,
             "inputs": self.inputs,
-            "output_type": self.output_type
+            "output_type": self.output_type,
+            "version": getattr(self, "version", "1.0.0"),
+            "author": getattr(self, "author", "DiscoSui Team"),
+            "documentation": getattr(self, "documentation", None)
         }
         
     @property
@@ -228,6 +286,13 @@ class BaseTool(Tool):
             str: The output type
         """
         raise NotImplementedError("Tool implementation must define output_type property")
+        
+    async def cleanup(self) -> None:
+        """Clean up any resources used by the tool.
+        
+        This method should be overridden by tools that need to perform cleanup.
+        """
+        pass
 
 class FrontmatterManagerTool(BaseTool):
     """Frontmatter management tool following smolagents Tool interface."""

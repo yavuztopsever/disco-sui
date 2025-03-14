@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Any, Type, Union, Tuple
+from typing import Dict, List, Optional, Any, Type, Union, Tuple, Callable, Awaitable
 from pydantic import BaseModel
 import logging
 from datetime import datetime
@@ -8,6 +8,7 @@ import asyncio
 from enum import Enum
 from dataclasses import dataclass
 from concurrent.futures import ThreadPoolExecutor
+from smolagents import Tool
 
 from .memory import MemoryManager, MemoryConfig
 from .context import ContextManager, ContextConfig
@@ -98,21 +99,23 @@ class RequestContext(BaseModel):
                 merged[context.source.value] = context.content
         return merged
 
-class IntegrationConfig(BaseModel):
-    """Configuration for the integration layer."""
-    memory_config: Optional[MemoryConfig] = None
-    context_config: Optional[ContextConfig] = None
-    strategy_config: Optional[StrategyConfig] = None
-    tool_config: Optional[ToolConfig] = None
-    enable_optimization: bool = True
-    max_retries: int = 3
-    retry_delay: float = 1.0
-    enable_rag: bool = True
-    enable_web_search: bool = True
-    context_relevance_threshold: float = 0.5
-    max_parallel_contexts: int = 3
-    error_threshold: float = 0.1  # Error rate threshold
-    stats_update_interval: int = 60  # Seconds
+class IntegrationConfig:
+    """Configuration for integration layer."""
+    def __init__(
+        self,
+        max_concurrent_requests: int = 4,
+        request_timeout: float = 30.0,
+        max_retries: int = 3,
+        retry_delay: float = 1.0,
+        enable_caching: bool = True,
+        cache_ttl: int = 3600
+    ):
+        self.max_concurrent_requests = max_concurrent_requests
+        self.request_timeout = request_timeout
+        self.max_retries = max_retries
+        self.retry_delay = retry_delay
+        self.enable_caching = enable_caching
+        self.cache_ttl = cache_ttl
 
 class ExecutionResult(BaseModel):
     """Model for execution results."""
@@ -605,4 +608,90 @@ class IntegrationLayer:
             await self.tool_manager.cleanup()
             
         except Exception as e:
-            logger.error(f"Cleanup failed: {e}") 
+            logger.error(f"Cleanup failed: {e}")
+
+class RequestProcessor:
+    """Processes integration requests."""
+    def __init__(self, config: IntegrationConfig):
+        self.config = config
+        self._semaphore = asyncio.Semaphore(config.max_concurrent_requests)
+        
+    async def process_request(
+        self,
+        request: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Process an integration request."""
+        async with self._semaphore:
+            try:
+                # Validate request
+                self._validate_request(request)
+                
+                # Process request with retry logic
+                result = await self._process_with_retry(request)
+                
+                return {
+                    "success": True,
+                    "result": result,
+                    "timestamp": datetime.now().isoformat()
+                }
+            except Exception as e:
+                return {
+                    "success": False,
+                    "error": str(e),
+                    "timestamp": datetime.now().isoformat()
+                }
+                
+    def _validate_request(self, request: Dict[str, Any]) -> None:
+        """Validate request parameters."""
+        required_fields = ["action", "parameters"]
+        for field in required_fields:
+            if field not in request:
+                raise ValueError(f"Missing required field: {field}")
+                
+    async def _process_with_retry(
+        self,
+        request: Dict[str, Any]
+    ) -> Any:
+        """Process request with retry logic."""
+        retries = 0
+        while retries <= self.config.max_retries:
+            try:
+                return await self._execute_request(request)
+            except Exception as e:
+                retries += 1
+                if retries <= self.config.max_retries:
+                    await asyncio.sleep(self.config.retry_delay * (2 ** retries))
+                else:
+                    raise
+                    
+    async def _execute_request(
+        self,
+        request: Dict[str, Any]
+    ) -> Any:
+        """Execute the request."""
+        action = request["action"]
+        parameters = request["parameters"]
+        
+        # Execute action
+        if action == "process_note":
+            return await self._process_note(parameters)
+        elif action == "process_folder":
+            return await self._process_folder(parameters)
+        else:
+            raise ValueError(f"Invalid action: {action}")
+            
+    async def _process_note(
+        self,
+        parameters: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Process a note."""
+        # Implementation specific to note processing
+        pass
+        
+    async def _process_folder(
+        self,
+        parameters: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Process a folder."""
+        # Implementation specific to folder processing
+        pass 

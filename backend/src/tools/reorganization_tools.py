@@ -6,6 +6,9 @@ import json
 from datetime import datetime
 import shutil
 from collections import defaultdict
+from .base_tools import BaseTool
+import asyncio
+from smolagents import Tool
 
 class AnalyzeVaultTool(OrganizationTool):
     """Tool for analyzing vault structure."""
@@ -55,7 +58,7 @@ class ReorganizeVaultTool(OrganizationTool):
             Path(directory) if directory else None
         )
 
-class VaultOrganizationTool(OrganizationTool):
+class VaultOrganizationTool(BaseTool):
     """Tool for analyzing and organizing vault structure."""
     name = "vault_organization"
     description = "Analyze and organize vault structure"

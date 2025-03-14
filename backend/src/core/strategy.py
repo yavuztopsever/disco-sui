@@ -5,6 +5,7 @@ from datetime import datetime
 import json
 from pathlib import Path
 from enum import Enum
+from smolagents import Tool
 
 logger = logging.getLogger(__name__)
 
@@ -40,14 +41,23 @@ class Strategy(BaseModel):
     last_used: Optional[datetime] = None
     metadata: Dict[str, Any] = {}
 
-class StrategyConfig(BaseModel):
-    """Configuration for strategy management."""
-    max_strategies: int = 1000
-    min_success_rate: float = 0.3
-    strategy_storage_path: Path = Path(".strategies")
-    enable_learning: bool = True
-    max_parallel_steps: int = 5
-    default_timeout: float = 30.0
+class StrategyConfig:
+    """Configuration for strategy execution."""
+    def __init__(
+        self,
+        max_concurrent_steps: int = 4,
+        step_timeout: float = 30.0,
+        max_retries: int = 3,
+        retry_delay: float = 1.0,
+        enable_optimization: bool = True,
+        max_chain_length: int = 10
+    ):
+        self.max_concurrent_steps = max_concurrent_steps
+        self.step_timeout = step_timeout
+        self.max_retries = max_retries
+        self.retry_delay = retry_delay
+        self.enable_optimization = enable_optimization
+        self.max_chain_length = max_chain_length
 
 class StrategyManager:
     """Enhanced strategy manager with learning capabilities."""
@@ -328,7 +338,7 @@ class StrategyManager:
         for step_id in entry_points:
             current_group.append(step_id)
             
-            if len(current_group) >= self.config.max_parallel_steps:
+            if len(current_group) >= self.config.max_concurrent_steps:
                 groups.append(current_group)
                 current_group = []
                 
@@ -482,7 +492,7 @@ class StrategyManager:
                 tool_executor,
                 step.tool_name,
                 parameters,
-                step.timeout_seconds or self.config.default_timeout
+                step.timeout_seconds or self.config.step_timeout
             )
             
             return result
@@ -554,7 +564,7 @@ class StrategyManager:
                 
             retries += 1
             if retries <= step.max_retries:
-                await asyncio.sleep(2 ** retries)  # Exponential backoff
+                await asyncio.sleep(self.config.retry_delay * 2 ** retries)  # Exponential backoff
                 
         return result
         

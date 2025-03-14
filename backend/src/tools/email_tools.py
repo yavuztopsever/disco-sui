@@ -136,29 +136,6 @@ class GetEmailNoteTool(EmailToolInterface):
         """
         return await self.get_email_note(email_path)
 
-class ImportEmailsTool(EmailToolInterface):
-    """Tool for importing emails from various sources."""
-    name = "import_emails"
-    description = "Import emails from external sources"
-    
-    async def forward(
-        self,
-        source: str,
-        source_path: str,
-        target_folder: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """Import emails from external sources.
-        
-        Args:
-            source: Source type (e.g., 'mbox', 'eml', 'outlook')
-            source_path: Path to source file or folder
-            target_folder: Optional folder to import emails to
-            
-        Returns:
-            Dictionary containing import results
-        """
-        return await self.import_emails(source, source_path, target_folder)
-
 class ExportEmailsTool(EmailToolInterface):
     """Tool for exporting emails to various formats."""
     name = "export_emails"

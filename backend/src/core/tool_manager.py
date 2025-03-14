@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Any, Type, Callable
+from typing import Dict, List, Optional, Any, Type, Callable, Union, Awaitable
 from pydantic import BaseModel, Field
 from ..core.exceptions import LLMError, RAGError, ToolError
 from ..core.config import settings
@@ -15,16 +15,71 @@ from concurrent.futures import ThreadPoolExecutor
 
 logger = logging.getLogger(__name__)
 
-@dataclass
+class ToolConfig:
+    """Configuration for tool execution."""
+    def __init__(
+        self,
+        max_concurrent_tools: int = 4,
+        enable_dependency_injection: bool = True,
+        default_timeout: float = 30.0,
+        max_retries: int = 3,
+        retry_delay: float = 1.0
+    ):
+        self.max_concurrent_tools = max_concurrent_tools
+        self.enable_dependency_injection = enable_dependency_injection
+        self.default_timeout = default_timeout
+        self.max_retries = max_retries
+        self.retry_delay = retry_delay
+
+class ToolMetadata:
+    """Metadata for a tool."""
+    def __init__(
+        self,
+        name: str,
+        description: str,
+        category: str,
+        version: str = "1.0.0",
+        author: str = "DiscoSui Team",
+        documentation: Optional[str] = None
+    ):
+        self.name = name
+        self.description = description
+        self.category = category
+        self.version = version
+        self.author = author
+        self.documentation = documentation
+
 class ToolStats:
-    """Statistics for tool usage."""
-    success_count: int = 0
-    failure_count: int = 0
-    total_execution_time: float = 0.0
-    average_execution_time: float = 0.0
-    last_used: Optional[datetime] = None
-    error_types: Dict[str, int] = {}
-    dependency_failures: Dict[str, int] = {}
+    """Statistics for tool execution."""
+    def __init__(self):
+        self.total_calls = 0
+        self.successful_calls = 0
+        self.failed_calls = 0
+        self.average_execution_time = 0.0
+        self.last_execution_time = None
+        self.error_counts: Dict[str, int] = {}
+        
+    def update(
+        self,
+        success: bool,
+        execution_time: float,
+        error: Optional[str] = None
+    ) -> None:
+        """Update tool statistics."""
+        self.total_calls += 1
+        if success:
+            self.successful_calls += 1
+        else:
+            self.failed_calls += 1
+            if error:
+                self.error_counts[error] = self.error_counts.get(error, 0) + 1
+                
+        # Update execution time stats
+        self.average_execution_time = (
+            (self.average_execution_time * (self.total_calls - 1) + execution_time)
+            / self.total_calls
+        )
+        self.last_execution_time = execution_time
 
 class ToolCategory(str, Enum):
     """Categories of tools available."""
@@ -33,196 +88,6 @@ class ToolCategory(str, Enum):
     ORGANIZATION = "organization"
     SERVICE = "service"
     UTILITY = "utility"
-
-class ToolMetadata(BaseModel):
-    """Metadata for a tool."""
-    name: str
-    category: ToolCategory
-    description: str
-    parameters: Dict[str, Any]
-    required_permissions: List[str] = []
-    version: str = "1.0.0"
-    author: Optional[str] = None
-    dependencies: List[str] = []
-    usage_examples: List[Dict[str, Any]] = []
-    max_retries: int = 3
-    timeout: float = 30.0
-    concurrent_limit: Optional[int] = None
-
-class ToolConfig(BaseModel):
-    """Configuration for tool management."""
-    max_concurrent_tools: int = 10
-    default_timeout: float = 30.0
-    enable_stats: bool = True
-    metadata_storage_path: Path = Path(".tool_metadata")
-    stats_storage_path: Path = Path(".tool_stats")
-    enable_dependency_injection: bool = True
-    enable_tool_composition: bool = True
-    max_chain_length: int = 10
-    chain_timeout: float = 300.0
-    retry_delay: float = 1.0
-    retry_backoff: float = 2.0
-
-class ToolDependency:
-    """Manages tool dependencies."""
-    def __init__(self, tool_name: str, metadata: ToolMetadata):
-        self.tool_name = tool_name
-        self.metadata = metadata
-        self.dependencies: List[str] = metadata.dependencies
-        self._resolved = False
-        self._resolution_order: List[str] = []
-        
-    def add_dependency(self, dependency: str):
-        """Add a dependency."""
-        if dependency not in self.dependencies:
-            self.dependencies.append(dependency)
-            self._resolved = False
-            
-    def remove_dependency(self, dependency: str):
-        """Remove a dependency."""
-        if dependency in self.dependencies:
-            self.dependencies.remove(dependency)
-            self._resolved = False
-            
-    def is_resolved(self) -> bool:
-        """Check if dependencies are resolved."""
-        return self._resolved
-        
-    def get_resolution_order(self) -> List[str]:
-        """Get dependency resolution order."""
-        return self._resolution_order
-        
-    def resolve(self, available_tools: List[str]) -> bool:
-        """Resolve dependencies."""
-        if not self.dependencies:
-            self._resolved = True
-            self._resolution_order = [self.tool_name]
-            return True
-            
-        # Check if all dependencies are available
-        missing = [dep for dep in self.dependencies if dep not in available_tools]
-        if missing:
-            return False
-            
-        # Topological sort for resolution order
-        visited = set()
-        temp = set()
-        order = []
-        
-        def visit(tool: str):
-            if tool in temp:
-                raise ToolError(f"Circular dependency detected: {tool}")
-            if tool in visited:
-                return
-                
-            temp.add(tool)
-            for dep in self.dependencies:
-                visit(dep)
-            temp.remove(tool)
-            visited.add(tool)
-            order.append(tool)
-            
-        try:
-            visit(self.tool_name)
-            self._resolution_order = order
-            self._resolved = True
-            return True
-        except Exception as e:
-            logger.error(f"Dependency resolution failed: {e}")
-            return False
-
-class ToolRegistry:
-    """Handles tool registration and dependency management."""
-    def __init__(self):
-        self._tools: Dict[str, Type[Any]] = {}
-        self._metadata: Dict[str, ToolMetadata] = {}
-        self._dependencies: Dict[str, ToolDependency] = {}
-        self._executor = ThreadPoolExecutor(max_workers=4)
-        
-    def register(
-        self,
-        tool_class: Type[Any],
-        metadata: ToolMetadata
-    ) -> None:
-        """Register a tool with metadata."""
-        name = metadata.name
-        self._tools[name] = tool_class
-        self._metadata[name] = metadata
-        self._dependencies[name] = ToolDependency(name, metadata)
-        
-        # Resolve dependencies
-        self._dependencies[name].resolve(list(self._tools.keys()))
-        
-    def unregister(self, name: str) -> None:
-        """Unregister a tool."""
-        self._tools.pop(name, None)
-        self._metadata.pop(name, None)
-        self._dependencies.pop(name, None)
-        
-        # Update dependency resolution for affected tools
-        for dep in self._dependencies.values():
-            if name in dep.dependencies:
-                dep.remove_dependency(name)
-                dep.resolve(list(self._tools.keys()))
-                
-    def get_tool(self, name: str) -> Optional[Type[Any]]:
-        """Get a tool by name."""
-        return self._tools.get(name)
-        
-    def get_metadata(self, name: str) -> Optional[ToolMetadata]:
-        """Get tool metadata."""
-        return self._metadata.get(name)
-        
-    def list_tools(
-        self,
-        category: Optional[ToolCategory] = None
-    ) -> List[str]:
-        """List available tools."""
-        if category:
-            return [
-                name for name, meta in self._metadata.items()
-                if meta.category == category
-            ]
-        return list(self._tools.keys())
-        
-    def get_dependencies(
-        self,
-        tool_name: str
-    ) -> Optional[ToolDependency]:
-        """Get tool dependencies."""
-        return self._dependencies.get(tool_name)
-        
-    async def validate_tool_chain(
-        self,
-        chain: List[str]
-    ) -> bool:
-        """Validate a tool chain."""
-        if not chain:
-            return False
-            
-        # Check chain length
-        if len(chain) > self.config.max_chain_length:
-            return False
-            
-        # Check tool availability
-        for tool_name in chain:
-            if tool_name not in self._tools:
-                return False
-                
-        # Check dependency resolution
-        for i, tool_name in enumerate(chain):
-            dep = self._dependencies[tool_name]
-            if not dep.is_resolved():
-                return False
-                
-            # Check if dependencies are satisfied by previous tools
-            if i > 0:
-                prev_tools = chain[:i]
-                for required in dep.dependencies:
-                    if required not in prev_tools:
-                        return False
-                        
-        return True
 
 class ToolExecutor:
     """Handles tool execution with dependency injection."""
@@ -359,21 +224,20 @@ class ToolExecutor:
         
         # Update counts
         if success:
-            stats.success_count += 1
+            stats.successful_calls += 1
         else:
-            stats.failure_count += 1
+            stats.failed_calls += 1
             if error_type:
-                stats.error_types[error_type] = (
-                    stats.error_types.get(error_type, 0) + 1
-                )
+                stats.error_counts[error_type] = stats.error_counts.get(error_type, 0) + 1
                 
         # Update timing
         execution_time = (datetime.now() - start_time).total_seconds()
-        stats.total_execution_time += execution_time
-        total_executions = stats.success_count + stats.failure_count
+        stats.total_calls += 1
         stats.average_execution_time = (
-            stats.total_execution_time / total_executions
+            (stats.average_execution_time * (stats.total_calls - 1) + execution_time)
+            / stats.total_calls
         )
+        stats.last_execution_time = execution_time
         
         stats.last_used = datetime.now()
         self._stats[tool_name] = stats

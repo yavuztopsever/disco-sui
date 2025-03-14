@@ -1,4 +1,4 @@
-from typing import List, Dict, Any, Optional, Protocol, Union
+from typing import List, Dict, Any, Optional, Protocol, Union, Type, Callable, Awaitable
 from pathlib import Path
 from pydantic import BaseModel
 from .text_processing import TextProcessor, ChunkingConfig
@@ -9,6 +9,8 @@ from .base_interfaces import BaseInterface, ServiceInterface
 from abc import ABC, abstractmethod
 from datetime import datetime
 import json
+import asyncio
+from smolagents import Tool
 
 class ToolResponse(BaseModel):
     """Standard response model for tools."""
@@ -790,101 +792,25 @@ class ServiceTool(BaseTool):
             raise ValueError(f"Service not available: {service_name}")
         return await service.update(target_paths, force_update, **kwargs)
 
-class ServiceRegistry:
-    """Registry for managing services."""
-    
-    def __init__(self):
-        self._services: Dict[str, Any] = {}
-        self._status: Dict[str, str] = {}
-        
-    async def register_service(
-        self,
-        name: str,
-        service: Any,
-        dependencies: Optional[List[str]] = None
-    ) -> None:
-        """Register a service.
-        
-        Args:
-            name: Service name
-            service: Service instance
-            dependencies: Optional list of service dependencies
-        """
-        self._services[name] = {
-            "service": service,
-            "dependencies": dependencies or []
-        }
-        self._status[name] = "registered"
-        
-    async def get_service(self, name: str) -> Optional[Any]:
-        """Get a service by name.
-        
-        Args:
-            name: Service name
-            
-        Returns:
-            Service instance if found
-        """
-        service_info = self._services.get(name)
-        return service_info["service"] if service_info else None
-        
-    async def start_service(self, name: str) -> None:
-        """Start a service and its dependencies.
-        
-        Args:
-            name: Service name
-        """
-        service_info = self._services.get(name)
-        if not service_info:
-            raise ValueError(f"Service not found: {name}")
-            
-        # Start dependencies first
-        for dep in service_info["dependencies"]:
-            await self.start_service(dep)
-            
-        service = service_info["service"]
-        await service.start()
-        self._status[name] = "running"
-        
-    async def stop_service(self, name: str) -> None:
-        """Stop a service.
-        
-        Args:
-            name: Service name
-        """
-        service_info = self._services.get(name)
-        if not service_info:
-            raise ValueError(f"Service not found: {name}")
-            
-        service = service_info["service"]
-        await service.stop()
-        self._status[name] = "stopped"
-        
-    async def get_status(self, name: str) -> str:
-        """Get service status.
-        
-        Args:
-            name: Service name
-            
-        Returns:
-            Service status
-        """
-        return self._status.get(name, "unknown")
-        
-    async def list_services(self) -> List[Dict[str, Any]]:
-        """List all registered services.
-        
-        Returns:
-            List of service information
-        """
-        services = []
-        for name, info in self._services.items():
-            services.append({
-                "name": name,
-                "status": self._status[name],
-                "dependencies": info["dependencies"]
-            })
-        return services
+class FolderTool(Tool):
+    """Base interface for folder management tools."""
+    # ... existing code ...
+
+class AudioTool(Tool):
+    """Base interface for audio processing tools."""
+    # ... existing code ...
+
+class IndexingTool(Tool):
+    """Base interface for indexing and search tools."""
+    # ... existing code ...
+
+class SemanticTool(Tool):
+    """Base interface for semantic analysis tools."""
+    # ... existing code ...
+
+class OrganizationTool(Tool):
+    """Base interface for organization tools."""
+    # ... existing code ...
 
 class ToolHierarchy:
     """Tool hierarchy configuration."""

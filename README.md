@@ -1,114 +1,133 @@
-# DiscoSui Project
+# DiscoSui - Your Intelligent Obsidian Companion
+
+<div align="center">
+
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.9%2B-blue)](https://www.python.org/downloads/)
+[![Docker](https://img.shields.io/badge/docker-required-blue)](https://www.docker.com/get-started)
+[![Obsidian](https://img.shields.io/badge/obsidian-1.0.0%2B-purple)](https://obsidian.md/)
+
+</div>
 
 ## Overview
-DiscoSui is a powerful tool for managing and analyzing notes, emails, and other text content. The project provides a set of tools for semantic analysis, text processing, and email management.
 
-## Features
-- **Semantic Analysis**
-  - Analyze relationships between notes
-  - Find related notes based on content similarity
-  - Generate knowledge graphs
-  - Analyze individual notes for topics and entities
+DiscoSui transforms your Obsidian vault into a dynamic, interactive knowledge base. Using natural language processing, intelligent automation, and advanced retrieval techniques, DiscoSui helps you effortlessly access, manage, and expand your knowledge within Obsidian.
 
-- **Text Processing**
-  - Split text into semantic chunks
-  - Extract named entities
-  - Generate text summaries
-  - Analyze sentiment
+### Key Features
 
-- **Email Management**
-  - Process email content
-  - Extract email metadata
-  - Convert emails to notes
-  - Analyze email threads
-  - Import/export emails in various formats
+- 🗣️ **Natural Language Interaction**: Chat with your vault using natural language
+- 🤖 **Intelligent Automation**: Automate tasks using smolagents and Tool Manager
+- 🔍 **Context-Aware Insights**: Get detailed, contextual responses through RAG
+- 🔗 **Seamless Integration**: Automatically open relevant notes and nodes
+- 📝 **Template Enforcement**: Maintain consistent note structure
+- 🏷️ **Smart Tag Management**: Intelligent tag organization and suggestions
+- 📊 **Knowledge Graph**: Visual representation of your knowledge connections
+- 🎵 **Audio Processing**: Transcribe and analyze audio content
+- 📧 **Email Integration**: Process and organize email content
+- 🔎 **Semantic Search**: Find related content intelligently
 
-## Installation
-1. Clone the repository:
+## Quick Start
+
+### Prerequisites
+
+- Docker & Docker Compose
+- Python 3.9+
+- Node.js 16+
+- Obsidian
+
+### Installation
+
+1. **Clone the Repository**
    ```bash
-   git clone https://github.com/yavuztopsever/disco-sui.git
+   git clone https://github.com/yourusername/DiscoSui.git
    cd DiscoSui
    ```
 
-2. Create and activate a virtual environment:
+2. **Run Setup**
    ```bash
-   python -m venv .venv
-   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+   ./setup.sh
    ```
 
-3. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+3. **Configure Plugin**
+   - Open Obsidian Settings
+   - Go to Community Plugins
+   - Enable DiscoSui
+   - Configure API URL as `http://localhost:5000`
 
-4. Install spaCy language model:
-   ```bash
-   python -m spacy download en_core_web_sm
-   ```
+For detailed installation instructions, see our [Installation Guide](docs/getting-started/installation.md).
+
+## Documentation
+
+- [User Guide](docs/user-guide/README.md)
+- [Developer Guide](docs/developer-guide/architecture.md)
+- [API Reference](docs/api-reference/README.md)
+- [Deployment Guide](docs/deployment/README.md)
 
 ## Project Structure
+
 ```
-DiscoSui/
-├── backend/
+discosui/
+├── backend/                 # Python FastAPI backend
 │   ├── src/
-│   │   ├── core/
-│   │   │   ├── tool_interfaces.py
-│   │   │   └── exceptions.py
-│   │   ├── services/
-│   │   │   ├── semantic_analysis.py
-│   │   │   ├── text_processing.py
-│   │   │   └── email_processing.py
-│   │   └── tools/
-│   │       ├── semantic_tools.py
-│   │       ├── text_tools.py
-│   │       └── email_tools.py
-│   └── tests/
-│       ├── conftest.py
-│       └── test_tools.py
-├── requirements.txt
-└── README.md
+│   │   ├── core/           # Core functionality
+│   │   ├── services/       # Core services
+│   │   ├── tools/          # SmolAgent tools
+│   │   ├── agents/         # AI agents
+│   │   └── main.py         # Entry point
+├── frontend/               # React frontend
+├── docs/                   # Documentation
+├── docker/                 # Docker configuration
+├── config/                # Configuration files
+├── scripts/               # Utility scripts
+└── setup.sh              # Setup script
 ```
-
-## Tool Interfaces
-The project uses a set of standardized interfaces for different types of tools:
-
-### SemanticToolInterface
-- Base interface for semantic analysis tools
-- Provides methods for analyzing relationships, finding related notes, and generating knowledge graphs
-
-### TextToolInterface
-- Base interface for text processing tools
-- Provides methods for chunking text, extracting entities, summarizing text, and analyzing sentiment
-
-### EmailToolInterface
-- Base interface for email management tools
-- Provides methods for processing emails, extracting metadata, and converting emails to notes
 
 ## Development
-1. Install development dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
 
-2. Run tests:
-   ```bash
-   pytest backend/tests/
-   ```
+### Setup Development Environment
 
-3. Run linting and type checking:
-   ```bash
-   flake8 backend/
-   mypy backend/
-   black backend/
-   isort backend/
-   ```
+```bash
+./setup.sh dev
+```
+
+### Available Commands
+
+- `./setup.sh` - Full setup (default)
+- `./setup.sh dev` - Setup development environment
+- `./setup.sh start` - Start services
+- `./setup.sh stop` - Stop services
+- `./setup.sh restart` - Restart services
+- `./setup.sh logs` - View service logs
+- `./setup.sh help` - Show help message
 
 ## Contributing
+
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+
+### Development Flow
+
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Run tests and linting
+4. Run tests
 5. Submit a pull request
 
+## Security
+
+Security is important to us. Please see our [Security Policy](SECURITY.md) for details.
+
 ## License
-This project is licensed under the MIT License - see the LICENSE file for details.
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- [Obsidian](https://obsidian.md/) for the amazing knowledge base platform
+- [OpenAI](https://openai.com/) for the powerful language models
+- [smolagents](https://github.com/example/smolagents) for the agent framework
+- All our contributors and users
+
+## Support
+
+- [GitHub Issues](https://github.com/yourusername/DiscoSui/issues)
+- [Documentation](docs/)
