@@ -226,4 +226,357 @@ class NoteManagerTool(BaseTool):
             "path": path,
             "metadata": metadata,
             "timestamp": datetime.now().isoformat()
-        } 
+        }
+
+class CreateNoteTool(BaseTool):
+    """Tool for creating notes in the Obsidian vault."""
+    
+    def __init__(self, vault_path: str):
+        """Initialize the create note tool."""
+        super().__init__()
+        self.vault_path = vault_path
+        self.note_manager = NoteManager(vault_path)
+        
+    @property
+    def name(self) -> str:
+        """Get the tool name."""
+        return "create_note"
+        
+    @property
+    def description(self) -> str:
+        """Get the tool description."""
+        return "Create a new note in the Obsidian vault"
+        
+    @property
+    def inputs(self) -> Dict[str, Any]:
+        """Get the tool input schema."""
+        return {
+            "title": {
+                "type": "string",
+                "description": "The title of the note",
+                "required": True
+            },
+            "content": {
+                "type": "string",
+                "description": "The content of the note",
+                "required": True
+            },
+            "folder": {
+                "type": "string",
+                "description": "The folder to create the note in",
+                "required": False
+            }
+        }
+        
+    @property
+    def output_type(self) -> str:
+        """Get the tool output type."""
+        return "object"
+        
+    async def _execute_tool(self, parameters: Dict[str, Any]) -> Any:
+        """Execute the create note operation.
+        
+        Args:
+            parameters (Dict[str, Any]): The validated parameters
+            
+        Returns:
+            Any: The operation result
+            
+        Raises:
+            ToolError: If the operation fails
+        """
+        title = parameters["title"]
+        content = parameters["content"]
+        folder = parameters.get("folder")
+        
+        try:
+            note_path = await self.note_manager.create_note(title, content, folder)
+            return {
+                "message": f"Created note {title}",
+                "path": str(note_path),
+                "timestamp": datetime.now().isoformat()
+            }
+        except Exception as e:
+            self.logger.error(f"Failed to create note: {str(e)}")
+            raise
+
+class UpdateNoteTool(BaseTool):
+    """Tool for updating notes in the Obsidian vault."""
+    
+    def __init__(self, vault_path: str):
+        """Initialize the update note tool."""
+        super().__init__()
+        self.vault_path = vault_path
+        self.note_manager = NoteManager(vault_path)
+        
+    @property
+    def name(self) -> str:
+        """Get the tool name."""
+        return "update_note"
+        
+    @property
+    def description(self) -> str:
+        """Get the tool description."""
+        return "Update an existing note in the Obsidian vault"
+        
+    @property
+    def inputs(self) -> Dict[str, Any]:
+        """Get the tool input schema."""
+        return {
+            "title": {
+                "type": "string",
+                "description": "The title of the note",
+                "required": True
+            },
+            "content": {
+                "type": "string",
+                "description": "The new content of the note",
+                "required": True
+            },
+            "folder": {
+                "type": "string",
+                "description": "The folder containing the note",
+                "required": False
+            }
+        }
+        
+    @property
+    def output_type(self) -> str:
+        """Get the tool output type."""
+        return "object"
+        
+    async def _execute_tool(self, parameters: Dict[str, Any]) -> Any:
+        """Execute the update note operation.
+        
+        Args:
+            parameters (Dict[str, Any]): The validated parameters
+            
+        Returns:
+            Any: The operation result
+            
+        Raises:
+            ToolError: If the operation fails
+        """
+        title = parameters["title"]
+        content = parameters["content"]
+        folder = parameters.get("folder")
+        
+        try:
+            success = await self.note_manager.update_note(title, content, folder)
+            if success:
+                return {
+                    "message": f"Updated note {title}",
+                    "success": True,
+                    "timestamp": datetime.now().isoformat()
+                }
+            else:
+                return {
+                    "message": f"Note {title} not found",
+                    "success": False,
+                    "timestamp": datetime.now().isoformat()
+                }
+        except Exception as e:
+            self.logger.error(f"Failed to update note: {str(e)}")
+            raise
+
+class DeleteNoteTool(BaseTool):
+    """Tool for deleting notes from the Obsidian vault."""
+    
+    def __init__(self, vault_path: str):
+        """Initialize the delete note tool."""
+        super().__init__()
+        self.vault_path = vault_path
+        self.note_manager = NoteManager(vault_path)
+        
+    @property
+    def name(self) -> str:
+        """Get the tool name."""
+        return "delete_note"
+        
+    @property
+    def description(self) -> str:
+        """Get the tool description."""
+        return "Delete a note from the Obsidian vault"
+        
+    @property
+    def inputs(self) -> Dict[str, Any]:
+        """Get the tool input schema."""
+        return {
+            "title": {
+                "type": "string",
+                "description": "The title of the note",
+                "required": True
+            },
+            "folder": {
+                "type": "string",
+                "description": "The folder containing the note",
+                "required": False
+            }
+        }
+        
+    @property
+    def output_type(self) -> str:
+        """Get the tool output type."""
+        return "object"
+        
+    async def _execute_tool(self, parameters: Dict[str, Any]) -> Any:
+        """Execute the delete note operation.
+        
+        Args:
+            parameters (Dict[str, Any]): The validated parameters
+            
+        Returns:
+            Any: The operation result
+            
+        Raises:
+            ToolError: If the operation fails
+        """
+        title = parameters["title"]
+        folder = parameters.get("folder")
+        
+        try:
+            success = await self.note_manager.delete_note(title, folder)
+            if success:
+                return {
+                    "message": f"Deleted note {title}",
+                    "success": True,
+                    "timestamp": datetime.now().isoformat()
+                }
+            else:
+                return {
+                    "message": f"Note {title} not found",
+                    "success": False,
+                    "timestamp": datetime.now().isoformat()
+                }
+        except Exception as e:
+            self.logger.error(f"Failed to delete note: {str(e)}")
+            raise
+
+class ListNotesTool(BaseTool):
+    """Tool for listing notes in the Obsidian vault."""
+    
+    def __init__(self, vault_path: str):
+        """Initialize the list notes tool."""
+        super().__init__()
+        self.vault_path = vault_path
+        self.note_manager = NoteManager(vault_path)
+        
+    @property
+    def name(self) -> str:
+        """Get the tool name."""
+        return "list_notes"
+        
+    @property
+    def description(self) -> str:
+        """Get the tool description."""
+        return "List notes in the Obsidian vault"
+        
+    @property
+    def inputs(self) -> Dict[str, Any]:
+        """Get the tool input schema."""
+        return {
+            "folder": {
+                "type": "string",
+                "description": "The folder to list notes from",
+                "required": False
+            }
+        }
+        
+    @property
+    def output_type(self) -> str:
+        """Get the tool output type."""
+        return "object"
+        
+    async def _execute_tool(self, parameters: Dict[str, Any]) -> Any:
+        """Execute the list notes operation.
+        
+        Args:
+            parameters (Dict[str, Any]): The validated parameters
+            
+        Returns:
+            Any: The operation result
+            
+        Raises:
+            ToolError: If the operation fails
+        """
+        folder = parameters.get("folder")
+        
+        try:
+            notes = await self.note_manager.list_notes(folder)
+            return {
+                "notes": notes,
+                "count": len(notes),
+                "folder": folder or "root",
+                "timestamp": datetime.now().isoformat()
+            }
+        except Exception as e:
+            self.logger.error(f"Failed to list notes: {str(e)}")
+            raise
+
+class SearchNotesTool(BaseTool):
+    """Tool for searching notes in the Obsidian vault."""
+    
+    def __init__(self, vault_path: str):
+        """Initialize the search notes tool."""
+        super().__init__()
+        self.vault_path = vault_path
+        self.note_manager = NoteManager(vault_path)
+        
+    @property
+    def name(self) -> str:
+        """Get the tool name."""
+        return "search_notes"
+        
+    @property
+    def description(self) -> str:
+        """Get the tool description."""
+        return "Search for notes in the Obsidian vault"
+        
+    @property
+    def inputs(self) -> Dict[str, Any]:
+        """Get the tool input schema."""
+        return {
+            "query": {
+                "type": "string",
+                "description": "The search query",
+                "required": True
+            },
+            "folder": {
+                "type": "string",
+                "description": "The folder to search in",
+                "required": False
+            }
+        }
+        
+    @property
+    def output_type(self) -> str:
+        """Get the tool output type."""
+        return "object"
+        
+    async def _execute_tool(self, parameters: Dict[str, Any]) -> Any:
+        """Execute the search notes operation.
+        
+        Args:
+            parameters (Dict[str, Any]): The validated parameters
+            
+        Returns:
+            Any: The operation result
+            
+        Raises:
+            ToolError: If the operation fails
+        """
+        query = parameters["query"]
+        folder = parameters.get("folder")
+        
+        try:
+            results = await self.note_manager.search_notes(query, folder)
+            return {
+                "results": results,
+                "count": len(results),
+                "query": query,
+                "folder": folder or "root",
+                "timestamp": datetime.now().isoformat()
+            }
+        except Exception as e:
+            self.logger.error(f"Failed to search notes: {str(e)}")
+            raise 

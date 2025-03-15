@@ -188,4 +188,66 @@ Sender""")
 @pytest.fixture
 def test_vault_path(test_data_dir: Path) -> str:
     """Return the path to the test vault."""
-    return str(test_data_dir) 
+    return str(test_data_dir)
+
+@pytest.fixture
+def mock_vault_path():
+    """Fixture for mock vault path."""
+    return Path("/mock/vault/path")
+
+@pytest.fixture
+def mock_context():
+    """Fixture for mock context."""
+    return MagicMock()
+
+@pytest.fixture
+def mock_tool_manager():
+    """Fixture for mock tool manager."""
+    return MagicMock()
+
+@pytest.fixture
+def mock_config():
+    """Fixture for mock configuration."""
+    return MagicMock()
+
+@pytest.fixture
+def mock_note_content():
+    """Fixture for mock note content."""
+    return """---
+title: Test Note
+tags: [test, mock]
+---
+# Test Note Content
+This is a test note content."""
+
+@pytest.fixture
+def mock_template_content():
+    """Fixture for mock template content."""
+    return """---
+title: {{ title }}
+tags: {{ tags }}
+---
+# {{ title }}
+{{ content }}"""
+
+@pytest.fixture
+def mock_file_system(tmp_path):
+    """Fixture for mock file system using temporary directory."""
+    # Create mock vault structure
+    vault_root = tmp_path / "vault"
+    vault_root.mkdir()
+    
+    # Create some test directories
+    (vault_root / "templates").mkdir()
+    (vault_root / "notes").mkdir()
+    (vault_root / "attachments").mkdir()
+    
+    return vault_root
+
+@pytest.fixture
+def mock_tools():
+    """Fixture for mock tools."""
+    return {
+        'test_tool': MagicMock(),
+        'another_tool': MagicMock()
+    } 

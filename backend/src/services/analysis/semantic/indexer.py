@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set, Union, Any
 from datetime import datetime
 import chromadb
 from chromadb.config import Settings
@@ -100,7 +100,7 @@ class Indexer:
         except Exception as e:
             raise RAGError(f"Error indexing directory {directory_path}: {str(e)}")
 
-    def search_notes(self, query: str, n_results: int = 5) -> List[Dict[str, any]]:
+    def search_notes(self, query: str, n_results: int = 5) -> List[Dict[str, Any]]:
         """Search for relevant notes using the vector database."""
         try:
             results = self.collection.query(
@@ -143,7 +143,7 @@ class Indexer:
         except Exception as e:
             raise RAGError(f"Error deleting note {note_title} from index: {str(e)}")
 
-    def get_note_chunks(self, note_title: str) -> List[Dict[str, any]]:
+    def get_note_chunks(self, note_title: str) -> List[Dict[str, Any]]:
         """Get all chunks for a note."""
         try:
             results = self.collection.get(

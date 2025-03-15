@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, Union, Any
 from pydantic import BaseModel
 import networkx as nx
 from ...core.exceptions import GraphError
@@ -11,7 +11,13 @@ class HierarchyNode(BaseModel):
     type: str  # e.g., "Person", "Category", "Main", "Document", "Note", "Log", "Code", "Mail"
     parent: Optional[str]
     children: List[str]
-    metadata: Dict[str, any]
+    metadata: Dict[str, Any]
+
+class Node(BaseModel):
+    """Model for a knowledge graph node."""
+    title: str
+    type: str
+    metadata: Dict[str, Any]
 
 class KnowledgeGraph:
     def __init__(self):
@@ -56,13 +62,13 @@ class KnowledgeGraph:
         except Exception as e:
             raise GraphError(f"Error adding node to hierarchy: {str(e)}")
 
-    def get_node_hierarchy(self, node_title: str) -> Dict[str, any]:
+    def get_node_hierarchy(self, node_title: str) -> Dict[str, Any]:
         """Get the complete hierarchy for a node."""
         try:
             if node_title not in self.hierarchy_graph:
                 raise GraphError(f"Node {node_title} does not exist")
 
-            def build_hierarchy(node: str) -> Dict[str, any]:
+            def build_hierarchy(node: str) -> Dict[str, Any]:
                 node_data = self.hierarchy_graph.nodes[node]
                 hierarchy = {
                     "title": node,
@@ -153,7 +159,7 @@ class KnowledgeGraph:
         except Exception as e:
             raise GraphError(f"Error analyzing node relationships: {str(e)}")
 
-    def suggest_node_connections(self, node_title: str) -> List[Dict[str, any]]:
+    def suggest_node_connections(self, node_title: str) -> List[Dict[str, Any]]:
         """Suggest potential connections for a node based on semantic analysis."""
         try:
             if node_title not in self.hierarchy_graph:
@@ -189,7 +195,7 @@ class KnowledgeGraph:
         except Exception as e:
             raise GraphError(f"Error suggesting node connections: {str(e)}")
 
-    def validate_hierarchy(self) -> List[Dict[str, any]]:
+    def validate_hierarchy(self) -> List[Dict[str, Any]]:
         """Validate the hierarchy structure and identify potential issues."""
         try:
             issues = []

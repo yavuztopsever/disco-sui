@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union, Any
 from pathlib import Path
 import asyncio
 from datetime import datetime
@@ -26,7 +26,7 @@ class AnalysisConfig(BaseModel):
 class SearchResult(BaseModel):
     """Model for search results."""
     content: str
-    metadata: Dict[str, any]
+    metadata: Dict[str, Any]
     score: float
     source_path: Path
     chunk_index: int
@@ -211,7 +211,7 @@ class AnalysisService(BaseService):
         except Exception as e:
             raise AnalysisError(f"Failed to find similar notes: {str(e)}")
 
-    async def analyze_note_content(self, content: str) -> Dict[str, any]:
+    async def analyze_note_content(self, content: str) -> Dict[str, Any]:
         """Analyze note content for semantic information."""
         # Implementation for content analysis
         pass 

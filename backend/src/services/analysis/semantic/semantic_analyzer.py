@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, Union, Any
 from pydantic import BaseModel
 from openai import OpenAI
 from ...core.exceptions import LLMError
@@ -18,11 +18,20 @@ class SemanticNode(BaseModel):
     entities: List[Dict[str, str]] = []
     topics: List[str] = []
 
+class GraphEdge(BaseModel):
+    """Model for a graph edge."""
+    source: str
+    target: str
+    weight: float
+    type: str
+    metadata: Dict[str, Any]
+
 class SemanticGraph(BaseModel):
     """Model for semantic graph."""
     nodes: Dict[str, SemanticNode]
-    edges: List[Dict[str, any]]
+    edges: List[Dict[str, Any]]
     clusters: Dict[str, List[str]]
+    metadata: Dict[str, Any]
 
 class SemanticAnalyzer:
     def __init__(self):
@@ -212,7 +221,7 @@ class SemanticAnalyzer:
         except Exception as e:
             raise LLMError(f"Error detecting communities: {str(e)}")
 
-    def find_related_notes(self, note_title: str, n_results: int = 5) -> List[Dict[str, any]]:
+    def find_related_notes(self, note_title: str, n_results: int = 5) -> List[Dict[str, Any]]:
         """Find semantically related notes."""
         try:
             if note_title not in self.graph:

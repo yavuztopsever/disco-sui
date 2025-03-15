@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union, Any
 from pathlib import Path
 from datetime import datetime
 import yaml
@@ -21,10 +21,10 @@ class NoteMetadata(BaseModel):
     title: str
     created: datetime = Field(default_factory=datetime.now)
     modified: datetime = Field(default_factory=datetime.now)
+    frontmatter: Dict[str, Any] = Field(default_factory=dict)
     tags: List[str] = Field(default_factory=list)
-    category: Optional[str] = None
-    aliases: List[str] = Field(default_factory=list)
-    custom_fields: Dict[str, any] = Field(default_factory=dict)
+    links: List[str] = Field(default_factory=list)
+    custom_fields: Dict[str, Any] = Field(default_factory=dict)
 
 class ContentConfig(BaseModel):
     """Configuration for content management service."""

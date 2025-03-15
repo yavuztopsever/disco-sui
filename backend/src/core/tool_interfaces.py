@@ -12,6 +12,24 @@ import json
 import asyncio
 from smolagents import Tool
 
+class BaseToolInterface(ABC):
+    """Base interface for all tool interfaces."""
+    
+    @abstractmethod
+    async def execute(self, **kwargs) -> Dict[str, Any]:
+        """Execute the tool's functionality."""
+        pass
+        
+    @abstractmethod
+    async def validate(self, **kwargs) -> bool:
+        """Validate tool parameters."""
+        pass
+        
+    @abstractmethod
+    async def get_schema(self) -> Dict[str, Any]:
+        """Get the tool's schema."""
+        pass
+
 class ToolResponse(BaseModel):
     """Standard response model for tools."""
     success: bool
@@ -811,6 +829,133 @@ class SemanticTool(Tool):
 class OrganizationTool(Tool):
     """Base interface for organization tools."""
     # ... existing code ...
+
+class IndexingToolInterface(BaseToolInterface):
+    """Interface for indexing tools."""
+    
+    @abstractmethod
+    async def index_content(self, content: str, **kwargs) -> Dict[str, Any]:
+        """Index content for search."""
+        pass
+        
+    @abstractmethod
+    async def search_index(self, query: str, **kwargs) -> List[Dict[str, Any]]:
+        """Search indexed content."""
+        pass
+        
+    @abstractmethod
+    async def update_index(self, content_id: str, content: str, **kwargs) -> Dict[str, Any]:
+        """Update indexed content."""
+        pass
+        
+    @abstractmethod
+    async def delete_from_index(self, content_id: str, **kwargs) -> Dict[str, Any]:
+        """Delete content from index."""
+        pass
+        
+    @abstractmethod
+    async def get_index_stats(self, **kwargs) -> Dict[str, Any]:
+        """Get index statistics."""
+        pass
+
+class HierarchyTool(BaseToolInterface):
+    """Interface for hierarchy management tools."""
+    
+    @abstractmethod
+    async def get_hierarchy(self, root_node: str = None) -> Dict[str, Any]:
+        """Get the hierarchy starting from a root node."""
+        pass
+        
+    @abstractmethod
+    async def add_node(self, node: str, parent: str = None) -> Dict[str, Any]:
+        """Add a node to the hierarchy."""
+        pass
+        
+    @abstractmethod
+    async def remove_node(self, node: str) -> Dict[str, Any]:
+        """Remove a node from the hierarchy."""
+        pass
+        
+    @abstractmethod
+    async def move_node(self, node: str, new_parent: str) -> Dict[str, Any]:
+        """Move a node to a new parent."""
+        pass
+        
+    @abstractmethod
+    async def get_node_info(self, node: str) -> Dict[str, Any]:
+        """Get information about a node."""
+        pass
+        
+    @abstractmethod
+    async def update_node(self, node: str, **kwargs) -> Dict[str, Any]:
+        """Update node information."""
+        pass
+        
+    @abstractmethod
+    async def validate_hierarchy(self) -> Dict[str, Any]:
+        """Validate the hierarchy structure."""
+        pass
+
+class ServiceManagerTool(BaseToolInterface):
+    """Interface for service management tools."""
+    
+    @abstractmethod
+    async def start_service(self, service_name: str, **kwargs) -> Dict[str, Any]:
+        """Start a service."""
+        pass
+        
+    @abstractmethod
+    async def stop_service(self, service_name: str) -> Dict[str, Any]:
+        """Stop a service."""
+        pass
+        
+    @abstractmethod
+    async def restart_service(self, service_name: str) -> Dict[str, Any]:
+        """Restart a service."""
+        pass
+        
+    @abstractmethod
+    async def get_service_status(self, service_name: str) -> Dict[str, Any]:
+        """Get service status."""
+        pass
+        
+    @abstractmethod
+    async def list_services(self) -> List[Dict[str, Any]]:
+        """List all services."""
+        pass
+        
+    @abstractmethod
+    async def update_service_config(self, service_name: str, config: Dict[str, Any]) -> Dict[str, Any]:
+        """Update service configuration."""
+        pass
+
+class ServiceRegistryTool(BaseToolInterface):
+    """Interface for service registry tools."""
+    
+    @abstractmethod
+    async def register_service(self, service_name: str, service_info: Dict[str, Any]) -> Dict[str, Any]:
+        """Register a service."""
+        pass
+        
+    @abstractmethod
+    async def unregister_service(self, service_name: str) -> Dict[str, Any]:
+        """Unregister a service."""
+        pass
+        
+    @abstractmethod
+    async def get_service_info(self, service_name: str) -> Dict[str, Any]:
+        """Get service information."""
+        pass
+        
+    @abstractmethod
+    async def list_registered_services(self) -> List[Dict[str, Any]]:
+        """List all registered services."""
+        pass
+        
+    @abstractmethod
+    async def update_service_info(self, service_name: str, service_info: Dict[str, Any]) -> Dict[str, Any]:
+        """Update service information."""
+        pass
 
 class ToolHierarchy:
     """Tool hierarchy configuration."""

@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set, Union, Any
 from pathlib import Path
 from datetime import datetime
 from ...core.exceptions import IndexingError
@@ -14,7 +14,7 @@ class VaultIndexer:
         self.note_manager = NoteManager()
         self.vault_path = Path(settings.VAULT_PATH)
 
-    def index_vault(self) -> Dict[str, any]:
+    def index_vault(self) -> Dict[str, Any]:
         """Index the entire vault and create knowledge graph."""
         try:
             results = {
@@ -65,7 +65,7 @@ class VaultIndexer:
         except Exception as e:
             raise IndexingError(f"Error indexing vault: {str(e)}")
 
-    def update_note_index(self, note_title: str) -> Dict[str, any]:
+    def update_note_index(self, note_title: str) -> Dict[str, Any]:
         """Update index and knowledge graph for a single note."""
         try:
             results = {
@@ -100,7 +100,7 @@ class VaultIndexer:
         except Exception as e:
             raise IndexingError(f"Error updating note index: {str(e)}")
 
-    def get_note_hierarchy(self, note_title: str) -> Dict[str, any]:
+    def get_note_hierarchy(self, note_title: str) -> Dict[str, Any]:
         """Get the complete hierarchy for a note."""
         try:
             return self.knowledge_graph.get_node_hierarchy(note_title)
@@ -114,14 +114,14 @@ class VaultIndexer:
         except Exception as e:
             raise IndexingError(f"Error getting note relationships: {str(e)}")
 
-    def get_connection_suggestions(self, note_title: str) -> List[Dict[str, any]]:
+    def get_connection_suggestions(self, note_title: str) -> List[Dict[str, Any]]:
         """Get suggestions for potential connections."""
         try:
             return self.knowledge_graph.suggest_node_connections(note_title)
         except Exception as e:
             raise IndexingError(f"Error getting connection suggestions: {str(e)}")
 
-    def get_merged_graph(self) -> Dict[str, any]:
+    def get_merged_graph(self) -> Dict[str, Any]:
         """Get the merged semantic and hierarchy graph."""
         try:
             merged_graph = self.knowledge_graph.merge_semantic_and_hierarchy()
@@ -159,7 +159,7 @@ class VaultIndexer:
         except Exception as e:
             raise IndexingError(f"Error finding orphaned notes: {str(e)}")
 
-    def get_vault_statistics(self) -> Dict[str, any]:
+    def get_vault_statistics(self) -> Dict[str, Any]:
         """Get statistics about the vault's structure."""
         try:
             stats = {

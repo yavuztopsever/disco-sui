@@ -155,6 +155,66 @@ class EmailProcessingError(ServiceError):
             **kwargs
         )
 
+class EmailServiceError(ServiceError):
+    """Exception raised for errors in email service operations."""
+    
+    def __init__(
+        self,
+        message: str,
+        operation: Optional[str] = None,
+        email_id: Optional[str] = None,
+        **kwargs
+    ):
+        """Initialize email service error.
+        
+        Args:
+            message: Error message
+            operation: Optional operation that failed
+            email_id: Optional ID of the email being processed
+            **kwargs: Additional keyword arguments for base class
+        """
+        details = kwargs.pop("details", {})
+        details.update({
+            "operation": operation,
+            "email_id": email_id
+        })
+        super().__init__(
+            message,
+            service_name="email_service",
+            details=details,
+            **kwargs
+        )
+
+class EmailImportError(ServiceError):
+    """Exception raised for errors during email import operations."""
+    
+    def __init__(
+        self,
+        message: str,
+        source: Optional[str] = None,
+        import_stage: Optional[str] = None,
+        **kwargs
+    ):
+        """Initialize email import error.
+        
+        Args:
+            message: Error message
+            source: Optional source of the email being imported
+            import_stage: Optional stage where import failed
+            **kwargs: Additional keyword arguments for base class
+        """
+        details = kwargs.pop("details", {})
+        details.update({
+            "source": source,
+            "import_stage": import_stage
+        })
+        super().__init__(
+            message,
+            service_name="email_import",
+            details=details,
+            **kwargs
+        )
+
 class AudioProcessingError(ServiceError):
     """Exception raised for errors in audio processing service."""
     
@@ -181,6 +241,36 @@ class AudioProcessingError(ServiceError):
         super().__init__(
             message,
             service_name="audio_processing",
+            details=details,
+            **kwargs
+        )
+
+class AudioServiceError(ServiceError):
+    """Exception raised for errors in audio service operations."""
+    
+    def __init__(
+        self,
+        message: str,
+        operation: Optional[str] = None,
+        audio_id: Optional[str] = None,
+        **kwargs
+    ):
+        """Initialize audio service error.
+        
+        Args:
+            message: Error message
+            operation: Optional operation that failed
+            audio_id: Optional ID of the audio being processed
+            **kwargs: Additional keyword arguments for base class
+        """
+        details = kwargs.pop("details", {})
+        details.update({
+            "operation": operation,
+            "audio_id": audio_id
+        })
+        super().__init__(
+            message,
+            service_name="audio_service",
             details=details,
             **kwargs
         )
@@ -241,6 +331,35 @@ class AnalysisError(ServiceError):
         super().__init__(
             message,
             service_name="analysis",
+            details=details,
+            **kwargs
+        )
+
+class SemanticAnalysisError(AnalysisError):
+    """Exception raised for errors in semantic analysis operations."""
+    
+    def __init__(
+        self,
+        message: str,
+        analysis_type: Optional[str] = None,
+        content_id: Optional[str] = None,
+        **kwargs
+    ):
+        """Initialize semantic analysis error.
+        
+        Args:
+            message: Error message
+            analysis_type: Optional type of semantic analysis being performed
+            content_id: Optional ID of the content being analyzed
+            **kwargs: Additional keyword arguments for base class
+        """
+        details = kwargs.pop("details", {})
+        details.update({
+            "content_id": content_id
+        })
+        super().__init__(
+            message,
+            analysis_type=analysis_type,
             details=details,
             **kwargs
         )
@@ -453,27 +572,19 @@ class FileSystemError(DiscoSuiError):
 class TemplateError(DiscoSuiError):
     """Exception raised for template-related errors."""
     
-    def __init__(
-        self,
-        message: str,
-        template_name: Optional[str] = None,
-        template_type: Optional[str] = None,
-        **kwargs
-    ):
-        """Initialize template error.
+    def __init__(self, message: str, template_name: str = None, operation: str = None, **kwargs):
+        """Initialize the exception.
         
         Args:
             message: Error message
-            template_name: Optional name of the template
-            template_type: Optional type of template
-            **kwargs: Additional keyword arguments for base class
+            template_name: Name of the template that caused the error
+            operation: Operation that caused the error
+            **kwargs: Additional error information
         """
-        details = kwargs.pop("details", {})
-        details.update({
-            "template_name": template_name,
-            "template_type": template_type
-        })
-        super().__init__(message, error_code="TEMPLATE_ERROR", details=details, **kwargs)
+        super().__init__(message)
+        self.template_name = template_name
+        self.operation = operation
+        self.details = kwargs
 
 class HierarchyError(DiscoSuiError):
     """Exception raised for hierarchy-related errors."""
@@ -601,7 +712,7 @@ class IndexingError(DiscoSuiError):
         super().__init__(message, error_code="INDEX_ERROR", details=details, **kwargs)
 
 class NoteManagementError(DiscoSuiError):
-    """Raised when there's an error in note management operations."""
+    """Exception raised for errors in note management operations."""
     
     def __init__(
         self,
@@ -623,7 +734,32 @@ class NoteManagementError(DiscoSuiError):
             "note_path": note_path,
             "operation": operation
         })
-        super().__init__(message, error_code="NOTE_MGMT_ERROR", details=details, **kwargs)
+        super().__init__(message, details=details, **kwargs)
+
+class NoteManipulationError(DiscoSuiError):
+    """Exception raised for errors during note manipulation operations."""
+    
+    def __init__(
+        self,
+        message: str,
+        note_path: Optional[str] = None,
+        operation: Optional[str] = None,
+        **kwargs
+    ):
+        """Initialize note manipulation error.
+        
+        Args:
+            message: Error message
+            note_path: Optional path to the note being manipulated
+            operation: Optional operation that failed
+            **kwargs: Additional keyword arguments for base class
+        """
+        details = kwargs.pop("details", {})
+        details.update({
+            "note_path": note_path,
+            "operation": operation
+        })
+        super().__init__(message, details=details, **kwargs)
 
 class LLMError(DiscoSuiError):
     """Raised when there's an error in LLM operations."""
@@ -891,5 +1027,34 @@ class FolderNotFoundError(ResourceNotFoundError):
             message,
             resource_type="folder",
             resource_id=folder_path,
+            **kwargs
+        )
+
+class ToolError(DiscoSuiError):
+    """Exception raised for errors in tool execution."""
+    
+    def __init__(
+        self,
+        message: str,
+        tool_name: Optional[str] = None,
+        operation: Optional[str] = None,
+        **kwargs
+    ):
+        """Initialize tool error.
+        
+        Args:
+            message: Error message
+            tool_name: Optional name of the tool where the error occurred
+            operation: Optional operation that failed
+            **kwargs: Additional keyword arguments for base class
+        """
+        details = kwargs.pop("details", {})
+        details.update({
+            "tool_name": tool_name,
+            "operation": operation
+        })
+        super().__init__(
+            message,
+            details=details,
             **kwargs
         ) 

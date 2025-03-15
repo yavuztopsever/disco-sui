@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set, Union, Any
 from pydantic import BaseModel
 from openai import OpenAI
 from ...core.exceptions import RAGError, LLMError
@@ -33,7 +33,7 @@ class RAG:
         except Exception as e:
             raise LLMError(f"Error generating embedding: {str(e)}")
 
-    def get_relevant_context(self, query: str, n_results: int = 5) -> List[Dict[str, any]]:
+    def get_relevant_context(self, query: str, n_results: int = 5) -> List[Dict[str, Any]]:
         """Get relevant context from the vector database."""
         try:
             # Get initial results from vector search
@@ -59,7 +59,7 @@ class RAG:
         except Exception as e:
             raise RAGError(f"Error getting relevant context: {str(e)}")
 
-    def format_context(self, context: List[Dict[str, any]]) -> str:
+    def format_context(self, context: List[Dict[str, Any]]) -> str:
         """Format context for the LLM."""
         try:
             formatted_context = "Relevant information:\n\n"
@@ -69,7 +69,7 @@ class RAG:
         except Exception as e:
             raise RAGError(f"Error formatting context: {str(e)}")
 
-    def generate_response(self, query: str, context: List[Dict[str, any]]) -> RAGResponse:
+    def generate_response(self, query: str, context: List[Dict[str, Any]]) -> RAGResponse:
         """Generate a response using the LLM with context."""
         try:
             # Format context

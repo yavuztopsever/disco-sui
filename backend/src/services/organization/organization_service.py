@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Set, Union
+from typing import Dict, List, Optional, Set, Union, Any
 from pathlib import Path
 from datetime import datetime
 import re
@@ -24,7 +24,7 @@ class HierarchyNode(BaseModel):
     type: str  # 'category', 'note', 'tag'
     children: List[str] = Field(default_factory=list)
     parents: List[str] = Field(default_factory=list)
-    metadata: Dict[str, any] = Field(default_factory=dict)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
 
 class OrganizationConfig(BaseModel):
     """Configuration for organization service."""
