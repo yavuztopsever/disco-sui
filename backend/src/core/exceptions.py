@@ -336,33 +336,17 @@ class AnalysisError(ServiceError):
         )
 
 class SemanticAnalysisError(AnalysisError):
-    """Exception raised for errors in semantic analysis operations."""
+    """Error raised when semantic analysis fails."""
     
-    def __init__(
-        self,
-        message: str,
-        analysis_type: Optional[str] = None,
-        content_id: Optional[str] = None,
-        **kwargs
-    ):
-        """Initialize semantic analysis error.
+    def __init__(self, message: str, operation: Optional[str] = None):
+        """Initialize the error.
         
         Args:
             message: Error message
-            analysis_type: Optional type of semantic analysis being performed
-            content_id: Optional ID of the content being analyzed
-            **kwargs: Additional keyword arguments for base class
+            operation: Optional operation that failed
         """
-        details = kwargs.pop("details", {})
-        details.update({
-            "content_id": content_id
-        })
-        super().__init__(
-            message,
-            analysis_type=analysis_type,
-            details=details,
-            **kwargs
-        )
+        super().__init__(message)
+        self.operation = operation
 
 class OrganizationError(ServiceError):
     """Exception raised for errors in organization service."""
@@ -395,29 +379,17 @@ class OrganizationError(ServiceError):
         )
 
 class ConfigurationError(DiscoSuiError):
-    """Exception raised for configuration-related errors."""
+    """Error raised when configuration operations fail."""
     
-    def __init__(
-        self,
-        message: str,
-        config_key: Optional[str] = None,
-        invalid_value: Optional[Any] = None,
-        **kwargs
-    ):
-        """Initialize configuration error.
+    def __init__(self, message: str, config_key: Optional[str] = None):
+        """Initialize the error.
         
         Args:
             message: Error message
             config_key: Optional configuration key that caused the error
-            invalid_value: Optional invalid value that caused the error
-            **kwargs: Additional keyword arguments for base class
         """
-        details = kwargs.pop("details", {})
-        details.update({
-            "config_key": config_key,
-            "invalid_value": invalid_value
-        })
-        super().__init__(message, error_code="CONFIG_ERROR", details=details, **kwargs)
+        super().__init__(message)
+        self.config_key = config_key
 
 class ValidationError(DiscoSuiError):
     """Exception raised for validation errors."""
@@ -1031,30 +1003,184 @@ class FolderNotFoundError(ResourceNotFoundError):
         )
 
 class ToolError(DiscoSuiError):
-    """Exception raised for errors in tool execution."""
+    """Base class for tool-related errors."""
+    pass
+
+class ToolExecutionError(ToolError):
+    """Error raised when a tool execution fails."""
+    
+    def __init__(self, tool_name: str, message: str, cause: Optional[Exception] = None):
+        """Initialize the error.
+        
+        Args:
+            tool_name: Name of the tool that failed
+            message: Error message
+            cause: Optional cause of the error
+        """
+        super().__init__(f"Tool execution failed - {tool_name}: {message}")
+        self.tool_name = tool_name
+        self.cause = cause
+
+class AgentError(DiscoSuiError):
+    """Exception raised for errors in agent operations."""
     
     def __init__(
         self,
         message: str,
-        tool_name: Optional[str] = None,
+        agent_name: Optional[str] = None,
         operation: Optional[str] = None,
         **kwargs
     ):
-        """Initialize tool error.
+        """Initialize agent error.
         
         Args:
             message: Error message
-            tool_name: Optional name of the tool where the error occurred
+            agent_name: Optional name of the agent
             operation: Optional operation that failed
             **kwargs: Additional keyword arguments for base class
         """
         details = kwargs.pop("details", {})
         details.update({
-            "tool_name": tool_name,
+            "agent_name": agent_name,
+            "operation": operation
+        })
+        super().__init__(message, details=details, **kwargs)
+
+class StrategyError(DiscoSuiError):
+    """Exception raised for errors in strategy execution."""
+    
+    def __init__(
+        self,
+        message: str,
+        strategy_name: Optional[str] = None,
+        phase: Optional[str] = None,
+        **kwargs
+    ):
+        """Initialize strategy error.
+        
+        Args:
+            message: Error message
+            strategy_name: Optional name of the strategy
+            phase: Optional phase where the error occurred
+            **kwargs: Additional keyword arguments for base class
+        """
+        details = kwargs.pop("details", {})
+        details.update({
+            "strategy_name": strategy_name,
+            "phase": phase
+        })
+        super().__init__(message, details=details, **kwargs)
+
+class ContextError(DiscoSuiError):
+    """Exception raised for errors in context handling."""
+    
+    def __init__(
+        self,
+        message: str,
+        context_type: Optional[str] = None,
+        operation: Optional[str] = None,
+        **kwargs
+    ):
+        """Initialize context error.
+        
+        Args:
+            message: Error message
+            context_type: Optional type of context
+            operation: Optional operation that failed
+            **kwargs: Additional keyword arguments for base class
+        """
+        details = kwargs.pop("details", {})
+        details.update({
+            "context_type": context_type,
+            "operation": operation
+        })
+        super().__init__(message, details=details, **kwargs)
+
+class ReorganizationError(ServiceError):
+    """Exception raised for errors during note reorganization."""
+    
+    def __init__(
+        self,
+        message: str,
+        reorganization_type: Optional[str] = None,
+        target_path: Optional[str] = None,
+        **kwargs
+    ):
+        """Initialize reorganization error.
+        
+        Args:
+            message: Error message
+            reorganization_type: Optional type of reorganization
+            target_path: Optional path of the target being reorganized
+            **kwargs: Additional keyword arguments for base class
+        """
+        details = kwargs.pop("details", {})
+        details.update({
+            "reorganization_type": reorganization_type,
+            "target_path": target_path
+        })
+        super().__init__(
+            message,
+            service_name="reorganization",
+            details=details,
+            **kwargs
+        )
+
+class ToolNotFoundError(ToolError):
+    """Exception raised when a tool is not found."""
+    
+    def __init__(self, tool_name: str, **kwargs):
+        """Initialize tool not found error.
+        
+        Args:
+            tool_name: Name of the tool that was not found
+            **kwargs: Additional keyword arguments for base class
+        """
+        super().__init__(
+            message=f"Tool '{tool_name}' not found",
+            tool_name=tool_name,
+            **kwargs
+        )
+
+class ContentManipulationError(ContentManagementError):
+    """Exception raised for errors during content manipulation."""
+    
+    def __init__(
+        self,
+        message: str,
+        content_type: Optional[str] = None,
+        operation: Optional[str] = None,
+        **kwargs
+    ):
+        """Initialize content manipulation error.
+        
+        Args:
+            message: Error message
+            content_type: Optional type of content being manipulated
+            operation: Optional operation that failed
+            **kwargs: Additional keyword arguments for base class
+        """
+        details = kwargs.pop("details", {})
+        details.update({
+            "content_type": content_type,
             "operation": operation
         })
         super().__init__(
             message,
+            service_name="content_manipulation",
             details=details,
             **kwargs
-        ) 
+        )
+
+class PluginError(DiscoSuiError):
+    """Error raised when a plugin operation fails."""
+    
+    def __init__(self, message: str, plugin_name: Optional[str] = None):
+        """Initialize the error.
+        
+        Args:
+            message: Error message
+            plugin_name: Optional name of the plugin that caused the error
+        """
+        super().__init__(message)
+        self.plugin_name = plugin_name 

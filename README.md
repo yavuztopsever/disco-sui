@@ -39,7 +39,7 @@ DiscoSui transforms your Obsidian vault into a dynamic, interactive knowledge ba
 
 1. **Clone the Repository**
    ```bash
-   git clone https://github.com/yourusername/DiscoSui.git
+   git clone https://github.com/yavuztopsever/DiscoSui.git
    cd DiscoSui
    ```
 

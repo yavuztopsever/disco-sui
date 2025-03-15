@@ -100,16 +100,58 @@ class AudioTranscriber:
             raise AudioTranscriptionError(f"Failed to detect language: {str(e)}")
 
     async def generate_timestamps(self, audio_file: Path) -> List[Dict[str, Any]]:
-        """Generate word-level timestamps for an audio file."""
-        try:
-            # Transcribe with word timestamps
-            result = self.model.transcribe(
-                str(audio_file),
-                word_timestamps=True
-            )
+        """Generate word-level timestamps for an audio file.
+        
+        Args:
+            audio_file (Path): Path to the audio file
             
-            return result["words"]
-
+        Returns:
+            List[Dict[str, Any]]: List of word timestamps
+        """
+        try:
+            result = await self.transcribe_audio(audio_file)
+            timestamps = []
+            for segment in result["segments"]:
+                if "words" in segment:
+                    timestamps.extend(segment["words"])
+            return timestamps
         except Exception as e:
             logger.error(f"Error generating timestamps: {str(e)}")
-            raise AudioTranscriptionError(f"Failed to generate timestamps: {str(e)}") 
+            raise AudioTranscriptionError(f"Failed to generate timestamps: {str(e)}")
+
+    def get_transcription_config(self) -> Dict[str, Any]:
+        """Get the current transcription configuration.
+        
+        Returns:
+            Dict[str, Any]: Current configuration
+        """
+        return {
+            "model_name": self.settings.whisper_model_name,
+            "device": "cuda" if torch.cuda.is_available() else "cpu",
+            "language": self.settings.default_language,
+            "task": self.settings.transcription_task
+        }
+
+    def set_transcription_config(self, config: Dict[str, Any]) -> None:
+        """Update the transcription configuration.
+        
+        Args:
+            config (Dict[str, Any]): New configuration
+        """
+        if "model_name" in config:
+            self.settings.whisper_model_name = config["model_name"]
+            self.model = self._load_model()
+        
+        if "language" in config:
+            self.settings.default_language = config["language"]
+        
+        if "task" in config:
+            self.settings.transcription_task = config["task"]
+
+    async def get_supported_languages(self) -> List[str]:
+        """Get list of supported languages.
+        
+        Returns:
+            List[str]: List of supported languages
+        """
+        return list(whisper.tokenizer.LANGUAGES.keys()) 

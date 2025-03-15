@@ -6,8 +6,11 @@ from datetime import datetime
 import asyncio
 from smolagents import Tool
 
-class TemplateManagerTool(BaseTool):
-    """Template management tool following smolagents Tool interface."""
+class TemplateTool(BaseTool):
+    """Template management tool following smolagents Tool interface.
+    
+    This implements the TemplateTool functionality from Flow 6.
+    """
     
     def __init__(self, vault_path: str):
         """Initialize the template manager tool."""
@@ -18,12 +21,12 @@ class TemplateManagerTool(BaseTool):
     @property
     def name(self) -> str:
         """Get the tool name."""
-        return "template_manager"
+        return "TemplateTool"
         
     @property
     def description(self) -> str:
         """Get the tool description."""
-        return "Comprehensive template management for Obsidian vault"
+        return "Template management for creating, applying and validating Obsidian note templates"
         
     @property
     def inputs(self) -> Dict[str, Any]:
@@ -35,7 +38,7 @@ class TemplateManagerTool(BaseTool):
                 "enum": ["create", "update", "delete", "list", "get", "apply", "validate"],
                 "required": True
             },
-            "name": {
+            "template": {
                 "type": "string",
                 "description": "Template name",
                 "required": False
@@ -45,14 +48,14 @@ class TemplateManagerTool(BaseTool):
                 "description": "Template content for create/update operations",
                 "required": False
             },
-            "variables": {
+            "data": {
                 "type": "object",
                 "description": "Variables for template application",
                 "required": False
             },
-            "target_path": {
+            "path": {
                 "type": "string",
-                "description": "Target path for apply operation",
+                "description": "Target path for apply operation or path to validate",
                 "required": False
             }
         }
@@ -61,6 +64,35 @@ class TemplateManagerTool(BaseTool):
     def output_type(self) -> str:
         """Get the tool output type."""
         return "object"
+        
+    def get_manifest(self) -> Dict[str, Any]:
+        """Get the tool manifest for LLM agent.
+        
+        Returns:
+            Dict[str, Any]: Tool manifest with schema and examples
+        """
+        return {
+            "name": self.name,
+            "description": self.description,
+            "params": self.inputs,
+            "examples": [
+                {
+                    "action": "apply",
+                    "template": "daily",
+                    "data": {"date": "2025-03-15", "mood": "productive"}
+                },
+                {
+                    "action": "validate",
+                    "path": "/path/to/note.md",
+                    "template": "project"
+                },
+                {
+                    "action": "create",
+                    "template": "meeting",
+                    "content": "---\ndate: {{date}}\nparticipants: {{participants}}\n---\n# {{title}}\n\n## Agenda\n\n{{agenda}}\n\n## Notes\n\n## Action Items\n\n"
+                }
+            ]
+        }
         
     async def _execute_tool(self, parameters: Dict[str, Any]) -> Any:
         """Execute the template management operation.
@@ -81,7 +113,7 @@ class TemplateManagerTool(BaseTool):
             if not self.template_manager.is_running:
                 await self.template_manager.start()
                 
-            # Execute requested action
+            # Execute requested action based on Flow 6 (Template Management Flow)
             if action == "create":
                 return await self._create_template(parameters)
             elif action == "update":
@@ -169,35 +201,71 @@ class TemplateManagerTool(BaseTool):
         }
         
     async def _apply_template(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
-        """Apply a template to create a new note."""
-        name = parameters.get("name")
-        variables = parameters.get("variables", {})
-        target_path = parameters.get("target_path")
+        """Apply a template to create a new note.
         
-        if not name or not target_path:
-            raise ValueError("Name and target_path are required for apply operation")
+        This implements the "apply" action from Flow 6 (Template Management Flow).
+        """
+        template_name = parameters.get("template")
+        data = parameters.get("data", {})
+        path = parameters.get("path")
+        
+        if not template_name or not path:
+            raise ValueError("Template name and path are required for apply operation")
             
-        await self.template_manager.apply_template(name, target_path, variables)
+        # Get the template content
+        template_content = await self.template_manager.get_template(template_name)
+        
+        # Apply the template with variables
+        await self.template_manager.apply_template(template_name, path, data)
+        
+        # Return success with ObsidianAPI format as shown in Flow 6
         return {
-            "message": f"Applied template {name} to {target_path}",
-            "name": name,
-            "target_path": target_path,
+            "result": "success",
+            "template": template_name,
+            "path": path,
             "timestamp": datetime.now().isoformat()
         }
         
     async def _validate_template(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
-        """Validate a template's syntax."""
-        name = parameters.get("name")
-        if not name:
-            raise ValueError("Name is required for validate operation")
+        """Validate a note against a template.
+        
+        This implements the "validate" action from Flow 6 (Template Management Flow).
+        """
+        template_name = parameters.get("template")
+        path = parameters.get("path")
+        
+        if not template_name or not path:
+            raise ValueError("Template name and path are required for validate operation")
             
-        validation_result = await self.template_manager.validate_template(name)
+        # Get the note content
+        note_content = await self._get_note_content(path)
+        
+        # Get the template content
+        template_content = await self.template_manager.get_template(template_name)
+        
+        # Validate the note against the template
+        validation_result = await self.template_manager.validate_note_against_template(
+            note_content, 
+            template_content
+        )
+        
+        # Return validation result
         return {
-            "name": name,
-            "is_valid": validation_result.is_valid,
-            "errors": validation_result.errors if not validation_result.is_valid else [],
+            "validation_result": validation_result,
+            "template": template_name,
+            "path": path,
+            "is_valid": validation_result.get("is_valid", False),
+            "issues": validation_result.get("issues", []),
             "timestamp": datetime.now().isoformat()
         }
+        
+    async def _get_note_content(self, path: str) -> str:
+        """Helper method to get note content."""
+        note_path = Path(self.vault_path) / path
+        if not note_path.exists():
+            raise FileNotFoundError(f"Note not found: {path}")
+            
+        return note_path.read_text()
 
 class DeleteTemplateTool(BaseTool):
     """Template deletion tool following smolagents Tool interface."""
@@ -838,4 +906,101 @@ class TemplateEnforcementTool(BaseTool):
                     sections.append(line[3:].strip())
             return sections
         except Exception as e:
-            raise ToolError(f"Error extracting sections: {str(e)}") 
+            raise ToolError(f"Error extracting sections: {str(e)}")
+
+class CreateTemplateTool(BaseTool):
+    """Template creation tool following smolagents Tool interface."""
+    
+    def __init__(self, vault_path: str):
+        """Initialize the template creation tool."""
+        super().__init__()
+        self.vault_path = vault_path
+        self.template_manager = TemplateManager(vault_path)
+        
+    @property
+    def name(self) -> str:
+        """Get the tool name."""
+        return "create_template"
+        
+    @property
+    def description(self) -> str:
+        """Get the tool description."""
+        return "Create a new template in the vault"
+        
+    @property
+    def inputs(self) -> Dict[str, Any]:
+        """Get the tool input schema."""
+        return {
+            "name": {
+                "type": "string",
+                "description": "The name of the template",
+                "required": True
+            },
+            "content": {
+                "type": "string",
+                "description": "The template content",
+                "required": True
+            },
+            "folder": {
+                "type": "string",
+                "description": "Optional folder path to create the template in",
+                "required": False
+            },
+            "variables": {
+                "type": "object",
+                "description": "Default variables for the template",
+                "required": False
+            }
+        }
+        
+    @property
+    def output_type(self) -> str:
+        """Get the tool output type."""
+        return "object"
+        
+    async def _execute_tool(self, parameters: Dict[str, Any]) -> Any:
+        """Execute the template creation operation.
+        
+        Args:
+            parameters (Dict[str, Any]): The validated parameters
+            
+        Returns:
+            Any: The operation result
+            
+        Raises:
+            ToolError: If the operation fails
+        """
+        name = parameters["name"]
+        content = parameters["content"]
+        folder = parameters.get("folder")
+        variables = parameters.get("variables", {})
+        
+        try:
+            # Initialize service if needed
+            if not self.template_manager.is_running:
+                await self.template_manager.start()
+                
+            # Create template path
+            template_path = Path(self.vault_path)
+            if folder:
+                template_path = template_path / folder
+            template_path = template_path / f"{name}.md"
+            
+            # Create template
+            await self.template_manager.create_template(
+                name=name,
+                content=content,
+                path=str(template_path),
+                variables=variables
+            )
+            
+            return {
+                "message": f"Created template {name}",
+                "name": name,
+                "path": str(template_path),
+                "timestamp": datetime.now().isoformat()
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Template creation failed: {str(e)}")
+            raise 

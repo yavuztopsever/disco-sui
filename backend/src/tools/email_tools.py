@@ -10,30 +10,57 @@ from email.parser import BytesParser
 import mailparser
 from ..core.tool_interfaces import EmailToolInterface
 from ..core.exceptions import EmailProcessingError
-from ..services.email_processing import EmailProcessor
+from ..services.email.processor import EmailProcessor
+from pydantic import BaseModel, ConfigDict
+
+class ProcessEmailInput(BaseModel):
+    """Input for processing an email."""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
+    raw_email: str
+    categories: Optional[List[str]] = None
+
+class ProcessEmailOutput(BaseModel):
+    """Output from processing an email."""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
+    processed_data: Dict[str, Any]
+    note_path: Optional[str] = None
 
 class ProcessEmailTool(EmailToolInterface):
     """Tool for processing email content."""
     name = "process_email"
     description = "Process and analyze email content"
     
-    async def forward(
-        self,
-        email_content: str,
-        extract_attachments: bool = True,
-        analyze_content: bool = True
-    ) -> Dict[str, Any]:
-        """Process and analyze email content.
+    def __init__(self, email_processor: EmailProcessor):
+        """Initialize the email processing tool.
         
         Args:
-            email_content: Raw email content to process
-            extract_attachments: Whether to extract attachments
-            analyze_content: Whether to analyze email content
+            email_processor: Instance of EmailProcessor service
+        """
+        super().__init__()
+        self.email_processor = email_processor
+    
+    async def execute(self, input_data: ProcessEmailInput) -> ProcessEmailOutput:
+        """Execute the email processing tool.
+        
+        Args:
+            input_data: Input containing raw email and optional categories
             
         Returns:
-            Dictionary containing processed email data
+            ProcessEmailOutput containing processed data and optional note path
+            
+        Raises:
+            EmailProcessingError: If processing fails
         """
-        return await self.process_email(email_content, extract_attachments, analyze_content)
+        try:
+            processed_data = await self.email_processor.process_email(input_data.raw_email)
+            return ProcessEmailOutput(
+                processed_data=processed_data,
+                note_path=processed_data.get("note_path")
+            )
+        except Exception as e:
+            raise EmailProcessingError(f"Failed to process email: {str(e)}")
 
 class ExtractEmailMetadataTool(EmailToolInterface):
     """Tool for extracting email metadata."""

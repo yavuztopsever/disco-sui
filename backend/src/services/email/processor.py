@@ -8,11 +8,12 @@ import email
 import mailparser
 from datetime import datetime
 import jinja2
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from ...core.config import Settings
 from ...core.exceptions import EmailProcessingError
 from ...core.logging import get_logger
+from ..base_service import BaseService
 
 logger = get_logger(__name__)
 
@@ -28,17 +29,40 @@ class EmailContent(BaseModel):
     tags: List[str]
     categories: List[str]
 
-class EmailProcessor:
-    """Processor for handling email content and conversion to notes."""
+class EmailConfig(BaseModel):
+    """Configuration for email processing."""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
+    smtp_server: str
+    smtp_port: int
+    username: str
+    password: str
+    use_tls: bool = True
 
-    def __init__(self, settings: Settings):
-        """Initialize the email processor."""
-        self.settings = settings
+class EmailProcessor(BaseService):
+    """Service for processing and sending emails."""
+    
+    def __init__(self, config: Optional[EmailConfig] = None):
+        """Initialize the email processor.
+        
+        Args:
+            config: Optional email configuration.
+        """
+        super().__init__()
+        self.config = config
+        self._initialized = False
+        self.settings = Settings()
         self.template_env = jinja2.Environment(
-            loader=jinja2.FileSystemLoader(settings.template_path),
+            loader=jinja2.FileSystemLoader(self.settings.template_path),
             autoescape=True
         )
         self.email_template = self.template_env.get_template("email.md.j2")
+
+    async def initialize(self) -> None:
+        """Initialize the email processor service."""
+        if not self.config:
+            raise EmailProcessingError("Email processor not configured")
+        self._initialized = True
 
     async def process_email(self, raw_email: str) -> Dict[str, Any]:
         """Process a raw email and convert it to structured content."""
@@ -140,4 +164,39 @@ class EmailProcessor:
     async def cleanup_old_emails(self, days: Optional[int] = None):
         """Clean up old email notes based on retention policy."""
         # Implementation depends on retention policy
-        raise NotImplementedError("Email cleanup not implemented yet") 
+        raise NotImplementedError("Email cleanup not implemented yet")
+
+    async def send_email(self, to: List[str], subject: str, body: str) -> None:
+        """Send an email.
+        
+        Args:
+            to: List of recipient email addresses
+            subject: Email subject
+            body: Email body content
+            
+        Raises:
+            EmailProcessingError: If sending fails
+        """
+        if not self._initialized:
+            raise EmailProcessingError("Email processor not initialized")
+        
+        # TODO: Implement actual email sending logic
+        pass
+    
+    async def process_incoming_email(self, raw_email: str) -> dict:
+        """Process an incoming email.
+        
+        Args:
+            raw_email: Raw email content to process
+            
+        Returns:
+            dict: Processed email data
+            
+        Raises:
+            EmailProcessingError: If processing fails
+        """
+        if not self._initialized:
+            raise EmailProcessingError("Email processor not initialized")
+        
+        # TODO: Implement email processing logic
+        return {} 

@@ -2,7 +2,7 @@ from typing import Dict, List, Optional, Union, Any
 from pathlib import Path
 from datetime import datetime
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 import jinja2
 
 from ..base_service import BaseService
@@ -10,14 +10,18 @@ from ...core.exceptions import ContentManagementError
 
 class NoteTemplate(BaseModel):
     """Model for note templates."""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
     name: str
     content: str
-    frontmatter: Dict[str, any] = Field(default_factory=dict)
+    frontmatter: Dict[str, Any] = Field(default_factory=dict)
     tags: List[str] = Field(default_factory=list)
     category: Optional[str] = None
 
 class NoteMetadata(BaseModel):
     """Model for note metadata."""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
     title: str
     created: datetime = Field(default_factory=datetime.now)
     modified: datetime = Field(default_factory=datetime.now)
@@ -28,6 +32,8 @@ class NoteMetadata(BaseModel):
 
 class ContentConfig(BaseModel):
     """Configuration for content management service."""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
     vault_path: Path
     templates_path: Path
     default_template: str = "default"

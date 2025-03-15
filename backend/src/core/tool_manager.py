@@ -89,6 +89,243 @@ class ToolCategory(str, Enum):
     SERVICE = "service"
     UTILITY = "utility"
 
+class ToolDependency:
+    """Represents tool dependencies."""
+    
+    def __init__(self, tool_name: str):
+        """Initialize tool dependency.
+        
+        Args:
+            tool_name: Name of the tool
+        """
+        self.tool_name = tool_name
+        self.dependencies: List[str] = []
+        self.resolved = False
+        
+    def add_dependency(self, dependency: str) -> None:
+        """Add a dependency.
+        
+        Args:
+            dependency: Name of the dependent tool
+        """
+        if dependency not in self.dependencies:
+            self.dependencies.append(dependency)
+            
+    def is_resolved(self) -> bool:
+        """Check if dependencies are resolved.
+        
+        Returns:
+            bool: True if all dependencies are resolved
+        """
+        return self.resolved
+        
+    def get_resolution_order(self) -> List[str]:
+        """Get dependency resolution order.
+        
+        Returns:
+            List[str]: List of tool names in resolution order
+        """
+        order = []
+        visited = set()
+        
+        def visit(name: str):
+            if name not in visited:
+                visited.add(name)
+                for dep in self.dependencies:
+                    visit(dep)
+                order.append(name)
+                
+        visit(self.tool_name)
+        return order
+
+class ToolRegistry:
+    """Registry for managing tools."""
+    
+    def __init__(self):
+        """Initialize the tool registry."""
+        self._tools: Dict[str, Type[Any]] = {}
+        self._metadata: Dict[str, ToolMetadata] = {}
+        self._dependencies: Dict[str, ToolDependency] = {}
+        self._stats: Dict[str, ToolStats] = {}
+        self._manifests: Dict[str, Dict[str, Any]] = {}
+        
+    def register_tool(
+        self,
+        tool_class: Type[Any],
+        metadata: ToolMetadata,
+        dependencies: Optional[List[str]] = None,
+        manifest: Optional[Dict[str, Any]] = None
+    ) -> None:
+        """Register a tool.
+        
+        Args:
+            tool_class: Tool class
+            metadata: Tool metadata
+            dependencies: Optional list of tool dependencies
+            manifest: Optional tool manifest with schema and examples
+        """
+        if metadata.name in self._tools:
+            raise ToolError(f"Tool {metadata.name} already registered")
+            
+        self._tools[metadata.name] = tool_class
+        self._metadata[metadata.name] = metadata
+        
+        # Set up dependencies
+        dep = ToolDependency(metadata.name)
+        if dependencies:
+            for d in dependencies:
+                if d not in self._tools:
+                    raise ToolError(f"Dependency {d} not found")
+                dep.add_dependency(d)
+        self._dependencies[metadata.name] = dep
+        
+        # Store tool manifest
+        if manifest:
+            self._manifests[metadata.name] = manifest
+        else:
+            # Create default manifest from tool properties
+            self._manifests[metadata.name] = {
+                "name": metadata.name,
+                "description": metadata.description,
+                "params": {},
+                "examples": []
+            }
+        
+        # Initialize stats
+        self._stats[metadata.name] = ToolStats()
+        
+    def unregister_tool(self, name: str) -> None:
+        """Unregister a tool.
+        
+        Args:
+            name: Tool name
+        """
+        if name not in self._tools:
+            raise ToolError(f"Tool {name} not registered")
+            
+        del self._tools[name]
+        del self._metadata[name]
+        del self._dependencies[name]
+        del self._stats[name]
+        
+    def get_tool(self, name: str) -> Optional[Type[Any]]:
+        """Get a tool by name.
+        
+        Args:
+            name: Tool name
+            
+        Returns:
+            Optional[Type[Any]]: Tool class if found
+        """
+        return self._tools.get(name)
+        
+    def get_metadata(self, name: str) -> Optional[ToolMetadata]:
+        """Get tool metadata.
+        
+        Args:
+            name: Tool name
+            
+        Returns:
+            Optional[ToolMetadata]: Tool metadata if found
+        """
+        return self._metadata.get(name)
+    
+    def get_manifest(self, name: str) -> Optional[Dict[str, Any]]:
+        """Get tool manifest with schema and examples.
+        
+        Args:
+            name: Tool name
+            
+        Returns:
+            Optional[Dict[str, Any]]: Tool manifest if found
+        """
+        return self._manifests.get(name)
+        
+    def get_dependencies(self, name: str) -> Optional[ToolDependency]:
+        """Get tool dependencies.
+        
+        Args:
+            name: Tool name
+            
+        Returns:
+            Optional[ToolDependency]: Tool dependencies if found
+        """
+        return self._dependencies.get(name)
+        
+    def get_stats(self, name: str) -> Optional[ToolStats]:
+        """Get tool statistics.
+        
+        Args:
+            name: Tool name
+            
+        Returns:
+            Optional[ToolStats]: Tool statistics if found
+        """
+        return self._stats.get(name)
+        
+    def list_tools(self) -> List[str]:
+        """List all registered tools.
+        
+        Returns:
+            List[str]: List of tool names
+        """
+        return list(self._tools.keys())
+        
+    def get_tools_by_category(self, category: ToolCategory) -> List[str]:
+        """Get tools by category.
+        
+        Args:
+            category: Tool category
+            
+        Returns:
+            List[str]: List of tool names in the category
+        """
+        return [
+            name for name, metadata in self._metadata.items()
+            if metadata.category == category
+        ]
+        
+    async def validate_tool_chain(self, chain: List[str]) -> bool:
+        """Validate a tool chain.
+        
+        Args:
+            chain: List of tool names in execution order
+            
+        Returns:
+            bool: True if chain is valid
+        """
+        # Check all tools exist
+        for name in chain:
+            if name not in self._tools:
+                return False
+                
+        # Check dependencies
+        for i, name in enumerate(chain):
+            deps = self._dependencies[name]
+            for dep in deps.dependencies:
+                if dep not in chain[:i]:
+                    return False
+                    
+        return True
+        
+    def update_stats(
+        self,
+        name: str,
+        success: bool,
+        execution_time: float,
+        error: Optional[str] = None
+    ) -> None:
+        """Update tool statistics.
+        
+        Args:
+            name: Tool name
+            success: Whether execution was successful
+            execution_time: Execution time in seconds
+            error: Optional error message
+        """
+        if name in self._stats:
+            self._stats[name].update(success, execution_time, error)
+
 class ToolExecutor:
     """Handles tool execution with dependency injection."""
     def __init__(
@@ -268,10 +505,11 @@ class ToolManager:
     def register_tool(
         self,
         tool_class: Type[Any],
-        metadata: ToolMetadata
+        metadata: ToolMetadata,
+        manifest: Optional[Dict[str, Any]] = None
     ) -> None:
-        """Register a tool."""
-        self.registry.register(tool_class, metadata)
+        """Register a tool with optional manifest."""
+        self.registry.register_tool(tool_class, metadata, manifest=manifest)
         
     async def execute_tool(
         self,
@@ -294,6 +532,13 @@ class ToolManager:
     ) -> Optional[ToolMetadata]:
         """Get tool metadata."""
         return self.registry.get_metadata(tool_name)
+    
+    def get_tool_manifest(
+        self,
+        tool_name: str
+    ) -> Optional[Dict[str, Any]]:
+        """Get tool manifest with schema and examples."""
+        return self.registry.get_manifest(tool_name)
         
     def get_tool_stats(
         self,

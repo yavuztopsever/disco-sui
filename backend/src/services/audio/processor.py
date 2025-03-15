@@ -66,18 +66,28 @@ class AudioProcessor:
             raise AudioProcessingError(f"Failed to process transcription: {str(e)}")
 
     def _extract_tasks(self, text: str) -> List[str]:
-        """Extract tasks from transcription text."""
+        """Extract tasks from transcription text.
+        
+        Args:
+            text (str): Text to extract tasks from
+            
+        Returns:
+            List[str]: List of extracted tasks
+        """
         tasks = []
         
-        # Split text into sentences
-        sentences = text.split(".")
+        # Split text into lines
+        lines = text.split("\n")
         
-        # Look for task-like sentences
-        task_indicators = ["need to", "should", "must", "todo", "task", "remember to"]
-        for sentence in sentences:
-            sentence = sentence.strip().lower()
-            if any(indicator in sentence for indicator in task_indicators):
-                tasks.append(sentence.capitalize())
+        # Look for task-like lines
+        task_indicators = ["todo:", "task:", "action item:", "need to:", "should:", "must:"]
+        for line in lines:
+            line = line.strip().lower()
+            for indicator in task_indicators:
+                if indicator in line:
+                    task = line[line.index(indicator) + len(indicator):].strip()
+                    if task:
+                        tasks.append(task)
         
         return tasks
 
@@ -119,21 +129,40 @@ class AudioProcessor:
             raise AudioProcessingError(f"Failed to generate note content: {str(e)}")
 
     async def search_audio_notes(self, query: str) -> List[Dict[str, Any]]:
-        """Search for audio notes in the vault."""
-        # Implementation depends on the search backend being used
+        """Search through audio notes.
+        
+        Args:
+            query (str): Search query
+            
+        Returns:
+            List[Dict[str, Any]]: List of matching notes
+        """
         raise NotImplementedError("Audio note search not implemented yet")
 
-    async def get_audio_metadata(self, note_path: str) -> Dict[str, Any]:
-        """Get metadata for an audio note."""
-        # Implementation depends on how metadata is stored
+    async def get_audio_metadata(self, note_path: Path) -> Dict[str, Any]:
+        """Get metadata for an audio note.
+        
+        Args:
+            note_path (Path): Path to the note
+            
+        Returns:
+            Dict[str, Any]: Note metadata
+        """
         raise NotImplementedError("Audio metadata retrieval not implemented yet")
 
-    async def update_categories(self, note_path: str, categories: List[str]):
-        """Update categories for an audio note."""
-        # Implementation depends on how categories are stored
+    async def update_categories(self, note_path: Path, categories: List[str]) -> None:
+        """Update categories for an audio note.
+        
+        Args:
+            note_path (Path): Path to the note
+            categories (List[str]): New categories
+        """
         raise NotImplementedError("Category update not implemented yet")
 
-    async def cleanup_old_audio(self, days: Optional[int] = None):
-        """Clean up old audio notes based on retention policy."""
-        # Implementation depends on retention policy
+    async def cleanup_old_audio(self, days: int = 30) -> None:
+        """Clean up old audio files.
+        
+        Args:
+            days (int): Age threshold in days
+        """
         raise NotImplementedError("Audio cleanup not implemented yet") 

@@ -247,6 +247,80 @@ class ServiceManager:
             else:
                 raise ServiceError(f"Unknown service action: {action}")
 
+class ServiceRegistry:
+    """Registry for managing service instances."""
+    
+    def __init__(self):
+        """Initialize the service registry."""
+        self._services: Dict[str, BaseService] = {}
+        self._config = ServiceConfig()
+        self._manager = ServiceManager(self._config)
+        
+    def register_service(self, name: str, service: BaseService) -> None:
+        """Register a service.
+        
+        Args:
+            name: Service name
+            service: Service instance
+        """
+        if name in self._services:
+            raise ServiceError(f"Service {name} already registered")
+        self._services[name] = service
+        
+    def unregister_service(self, name: str) -> None:
+        """Unregister a service.
+        
+        Args:
+            name: Service name
+        """
+        if name not in self._services:
+            raise ServiceError(f"Service {name} not registered")
+        del self._services[name]
+        
+    def get_service(self, name: str) -> Optional[BaseService]:
+        """Get a service by name.
+        
+        Args:
+            name: Service name
+            
+        Returns:
+            Optional[BaseService]: The service instance if found
+        """
+        return self._services.get(name)
+        
+    def list_services(self) -> List[str]:
+        """List all registered services.
+        
+        Returns:
+            List[str]: List of service names
+        """
+        return list(self._services.keys())
+        
+    async def start_all(self) -> None:
+        """Start all registered services."""
+        await self._manager.start_services()
+        
+    async def stop_all(self) -> None:
+        """Stop all registered services."""
+        await self._manager.stop_services()
+        
+    async def get_status(self) -> Dict[str, Any]:
+        """Get status of all services.
+        
+        Returns:
+            Dict[str, Any]: Service status information
+        """
+        return await self._manager.get_service_status()
+        
+    def update_config(self, config: ServiceConfig) -> None:
+        """Update service configuration.
+        
+        Args:
+            config: New configuration
+        """
+        self._config = config
+        self._manager = ServiceManager(self._config)
+
 # Global service registry instance
 service_registry = ServiceRegistry()
 

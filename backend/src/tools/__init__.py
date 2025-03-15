@@ -1,4 +1,29 @@
 from .base_tools import BaseTool, FrontmatterManagerTool
+
+# Flow-based tools (organized by Flow number from flows.md)
+from .note_tools import NotesTool  # Flow 2: Semantic Notes Access and Editing Flow
+try:
+    from .reorganization_tools import VaultReorganizationTool  # Flow 4: Vault Reorganization Flow
+except ImportError:
+    pass  # In case the class doesn't exist yet
+try:
+    from .service_execution_tool import ServiceExecutionTool  # Flow 5: Service Execution Flow
+except ImportError:
+    pass  # In case the file doesn't exist yet
+try:
+    from .template_tools import TemplateTool  # Flow 6: Template Management Flow
+except ImportError:
+    pass  # In case the class doesn't exist yet
+try:
+    from .tag_tools import TagTool  # Flow 7: Tag Management Flow
+except ImportError:
+    pass  # In case the class doesn't exist yet
+try:
+    from .text_tools import ContentTool  # Flow 8: Content Processing Flow
+except ImportError:
+    pass  # In case the class doesn't exist yet
+
+# Legacy tools - these will be replaced by the flow-based tools
 from .note_tools import (
     CreateNoteTool,
     UpdateNoteTool,
@@ -52,6 +77,16 @@ __all__ = [
     # Base
     'BaseTool',
     'FrontmatterManagerTool',
+    
+    # Flow-based tools (primary tools that implement flows.md)
+    'NotesTool',                # Flow 2: Semantic Notes Access and Editing Flow
+    'VaultReorganizationTool',  # Flow 4: Vault Reorganization Flow
+    'ServiceExecutionTool',     # Flow 5: Service Execution Flow
+    'TemplateTool',             # Flow 6: Template Management Flow
+    'TagTool',                  # Flow 7: Tag Management Flow 
+    'ContentTool',              # Flow 8: Content Processing Flow
+    
+    # Legacy tools - these will be gradually replaced by the flow-based tools
     
     # Note Management
     'CreateNoteTool',

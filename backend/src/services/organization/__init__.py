@@ -1,5 +1,6 @@
-"""Organization service package."""
+"""Organization management service."""
 
-from .folders import FolderManager
+from .auth_manager import AuthManager
+from .vault_analyzer import VaultAnalyzer
 
-__all__ = ["FolderManager"]
+__all__ = ["AuthManager", "VaultAnalyzer"]

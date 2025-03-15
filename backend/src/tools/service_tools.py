@@ -111,40 +111,6 @@ class ServiceRegistryTool(ServiceTool):
 class ServiceTools(BaseTool):
     """Tools for managing and interacting with services."""
     
-    name = "service_tools"
-    description = "Tools for managing and interacting with services"
-    inputs = {
-        "list_services": {
-            "description": "List all registered services and their status"
-        },
-        "get_service_status": {
-            "description": "Get the current status of a service",
-            "required": ["service_name"]
-        },
-        "start_service": {
-            "description": "Start a service and its dependencies",
-            "required": ["service_name"]
-        },
-        "stop_service": {
-            "description": "Stop a service",
-            "required": ["service_name"]
-        },
-        "trigger_service_update": {
-            "description": "Trigger a service to update vault contents",
-            "required": ["service_name"],
-            "optional": ["target_notes", "force_update", "options"]
-        },
-        "health_check": {
-            "description": "Check if a service is healthy",
-            "required": ["service_name"]
-        },
-        "get_service_info": {
-            "description": "Get detailed information about a service",
-            "required": ["service_name"]
-        }
-    }
-    output_type = "object"
-    
     def __init__(self):
         """Initialize the service tools."""
         super().__init__()
